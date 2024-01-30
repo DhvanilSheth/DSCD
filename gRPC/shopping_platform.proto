@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package shoppingplatform;
+
+// Enum for item categories
+enum Category {
+  ELECTRONICS = 0;
+  FASHION = 1;
+  OTHERS = 2;
+  ANY = 3;
+}
+
+// Message for item details
+message Item {
+  int32 id = 1;
+  string name = 2;
+  Category category = 3;
+  int32 quantity = 4;
+  string description = 5;
+  string seller_address = 6;
+  double price = 7;
+  double rating = 8;
+}
+
+// Seller-related messages
+message RegisterSellerRequest {
+  string address = 1;
+  string uuid = 2;
+}
+
+message SellerItemOperationRequest {
+  string uuid = 1;
+  string address = 2;
+  Item item = 3;
+}
+
+message DisplayItemsRequest {
+  string uuid = 1;
+  string address = 2;
+}
+
+// Buyer-related messages
+message SearchItemRequest {
+  string name = 1;
+  Category category = 2;
+}
+
+message BuyItemRequest {
+  int32 item_id = 1;
+  int32 quantity = 2;
+  string buyer_address = 3;
+}
+
+message WishlistRequest {
+  int32 item_id = 1;
+  string buyer_address = 2;
+}
+
+message RateItemRequest {
+  int32 item_id = 1;
+  string buyer_address = 2;
+  int32 rating = 3;
+}
+
+// Response and notification messages
+message Response {
+  string message = 1;
+}
+
+message NotifyClientRequest {
+  Item updated_item = 1;
+}
+
+// Service definition for Market
+service MarketService {
+  rpc RegisterSeller(RegisterSellerRequest) returns (Response);
+  rpc SellItem(SellerItemOperationRequest) returns (Response);
+  rpc UpdateItem(SellerItemOperationRequest) returns (Response);
+  rpc DeleteItem(SellerItemOperationRequest) returns (Response);
+  rpc DisplaySellerItems(DisplayItemsRequest) returns (stream Item);
+  rpc SearchItem(SearchItemRequest) returns (stream Item);
+  rpc BuyItem(BuyItemRequest) returns (Response);
+  rpc AddToWishlist(WishlistRequest) returns (Response);
+  rpc RateItem(RateItemRequest) returns (Response);
+  rpc NotifyClient(stream NotifyClientRequest) returns (stream Response);
+}
