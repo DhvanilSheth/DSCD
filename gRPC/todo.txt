@@ -16,3 +16,117 @@
 Start by running market.py to initiate the server.
 Then run instances of seller.py and buyer.py to simulate the interactions.
 Test each functionality (like registering a seller, adding an item, searching for an item, etc.) to ensure the system works as expected.
+
+
+Make all the necessary changes in the files that are required. Do all the processes step by step.
+
+Here's what I have examined so far:
+
+The shopping_platform.proto file defines the structure for your shopping platform, including the data types and service interfaces for RPC communication. Here's a summary of its contents:
+
+Category: An enum that defines item categories including ELECTRONICS, FASHION, OTHERS, and ANY.
+Item: A message that includes item details such as ID, name, category, quantity, description, seller address, price, and rating.
+Seller-related messages: These include RegisterSellerRequest and SellerItemOperationRequest for seller operations, as well as DisplayItemsRequest for displaying seller items.
+Buyer-related messages: These include SearchItemRequest, BuyItemRequest, WishlistRequest, and RateItemRequest.
+Response and NotifyClientRequest: Messages for responses and notifications.
+MarketService: The service definition that includes all the RPC calls such as RegisterSeller, SellItem, UpdateItem, DeleteItem, DisplaySellerItems, SearchItem, BuyItem, AddToWishlist, RateItem, and NotifyClient.
+The .proto file looks to be correctly structured for the described assignment. However, without knowing the specifics of your implementation and environment setup, I cannot compile this file into Python stubs here. Typically, you would use the Protocol Buffer compiler protoc to generate the necessary Python code from this .proto file.
+
+The buyer.py file seems to implement the client side of the Buyer functionality for the shopping platform. Here's a summary of its contents and how it aligns with the requirements:
+
+Initialization: The BuyerClient class is initialized with an address and creates a gRPC channel to the Market service.
+
+Search Item: The search_item method corresponds to the SearchItem RPC. It sends a SearchItemRequest and prints out the details of each item received in the response. Error handling is implemented using a try-except block to catch RpcError.
+
+Buy Item: The buy_item method corresponds to the BuyItem RPC. It sends a BuyItemRequest and prints out the response message. RPC errors are also caught and printed.
+
+Add to Wishlist: The add_to_wishlist method corresponds to the AddToWishlist RPC. It sends a WishlistRequest and prints the response message, handling errors similarly.
+
+Rate Item: The rate_item method corresponds to the RateItem RPC. It sends a RateItemRequest and prints the response message, with error handling for RPC failures.
+
+Main Execution: In the __main__ block, an instance of BuyerClient is created with an example IP address and port. There are commented-out examples of how to use the class methods to interact with the Market service.
+
+The implementation appears to be consistent with the specified buyer functionalities. However, there are some points to consider:
+
+The channel is hardcoded to connect to 'localhost:50051'. In a real-world scenario, the address should be configurable.
+The methods print directly to the console, which is fine for testing but may need to be changed to a logging system for production use.
+It does not include the ability to receive notifications from the Market, which is part of the requirement for the buyer to receive updates on wishlisted items.
+
+The market.py file contains the server-side implementation of the Market for the shopping platform. Here's a breakdown of the code based on the provided assignment details:
+
+Import Statements: The necessary modules for concurrent execution, gRPC, and the generated shopping_platform_pb2 and shopping_platform_pb2_grpc files are imported.
+
+MarketService Class: This class is a service servicer, which implements the gRPC server-side handlers for the Market service defined in the .proto file.
+
+Constructor: Initializes dictionaries to store information about sellers, items, wishlists, and a counter for item IDs.
+
+RegisterSeller Method: Implements the functionality to register a seller. It checks if the UUID is already registered and either registers the new seller or returns a failure message.
+
+SellItem Method: Allows a seller to post a new item. It assigns a unique item ID, stores the item, and increments the item ID counter.
+
+UpdateItem Method: Enables sellers to update their listed items. It checks if the item exists and updates its details, including sending notifications to wishlisted buyers.
+
+DeleteItem Method: Provides the functionality for a seller to delete an item. It checks if the item exists and deletes it from the list.
+
+DisplaySellerItems Method: Allows sellers to view all their listed items. It streams back items that match the seller's address.
+
+SearchItem Method: Enables buyers to search for items by name and category. It yields items that match the search criteria.
+
+BuyItem Method: Allows buyers to purchase items. It checks for item existence and sufficient quantity before updating the item's quantity and returning a success message.
+
+AddToWishlist Method: Buyers can add items to their wishlist. It adds the buyer's address to the wishlist for the specified item ID.
+
+RateItem Method: Implements the rating functionality for buyers. It updates the item's rating if the item exists.
+
+NotifyClient Method: A placeholder method intended for the notification system, which isn't fully implemented yet.
+
+_notify_client Helper Method: Another placeholder for sending notifications to buyers, also not fully implemented.
+
+serve Function: Sets up and starts the gRPC server, adding the Market service to the server and specifying the port for the server to listen on.
+
+Main Execution: When running the script directly, it starts the server by calling the serve function.
+
+Observations and Suggestions:
+The NotifyClient and _notify_client methods are placeholders and do not contain the logic to send notifications to clients. This needs to be implemented according to the assignment requirements.
+
+The RateItem method simplifies the rating logic by directly updating the rating. The assignment doesn't specify how the average rating should be computed, but typically, you would need to average the new rating with existing ratings.
+
+The SellItem method responds with a success message that includes the item ID. According to the assignment, it should return either "SUCCESS", "FAIL", or the unique item ID. The implementation seems to be correct, but the success message could be adjusted to just "SUCCESS" for consistency.
+
+The BuyItem method needs to implement the notification trigger to the seller when an item is purchased.
+
+It's important to ensure that all print statements, as per the assignment's logging requirements, are included. The provided code does not include these print statements, so you will need to add them.
+
+Error handling is present for scenarios such as item not found or insufficient quantity, which is good. However, make sure that there's consistent handling of other potential errors (like network issues).
+
+The server is set up to listen on port 50051 without secure transport (insecure port). Depending on the assignment's security requirements, you might need to consider using secure communication for the gRPC server.
+
+The code does not currently handle concurrent updates safely. If two sellers try to update the same item at the same time, or if an item is being purchased while being updated, this could lead to race conditions. You may need to implement locking mechanisms to handle concurrency properly.
+
+You should integrate the necessary print statements for logging and complete the implementation of the notification system to fully align with the assignment requirements. Additionally, consider adding error handling and concurrency control for robustness. ​
+
+
+The seller.py script appears to be a client implementation for a seller in a shopping platform system. The script includes a SellerClient class that defines methods to interact with the market service using gRPC. Here's an analysis of the class methods based on the assignment description provided:
+
+Initialization: The __init__ method initializes the SellerClient with a provided address and UUID. It sets up the gRPC channel and stub for further communication with the market service.
+
+Register Seller: The register_seller method allows the seller to register with the market by sending its address and UUID. The market service should respond with a success or failure message. The script correctly constructs a RegisterSellerRequest and sends it to the RegisterSeller service.
+
+Sell Item: The sell_item method enables the seller to post a new item/product to the market. It sends details like product name, category, quantity, description, seller address, price per unit, and UUID for verification. The method appears to construct a SellerItemOperationRequest and sends it to the SellItem service. However, the script currently doesn't differentiate between item fields such as name, category, etc., which should be individually set in the request.
+
+Update Item: The update_item method allows the seller to update their listed items. It sends the item ID along with updated details such as price and quantity. The script sets the item ID correctly and sends the SellerItemOperationRequest to the UpdateItem service.
+
+Delete Item: The delete_item method permits the seller to delete an item by sending its item ID for deletion. The script constructs a SellerItemOperationRequest with the item ID set and sends it to the DeleteItem service.
+
+Display Seller Items: The display_items method enables the seller to view all their listed items. The script sends a DisplayItemsRequest and correctly processes the stream of item details received from the DisplaySellerItems service.
+
+Error Handling: Each method includes try-except blocks to handle RpcError exceptions, which is appropriate for dealing with communication errors in gRPC.
+
+Printing Responses: The script prints out the responses received from the market service, which aligns with the requirement that both sides must print what they received.
+
+However, there are a few considerations and potential issues:
+
+The script does not appear to implement the notification functionality required by the assignment. This would involve additional methods in both the SellerClient class and the server-side implementation to handle sending and receiving notifications.
+The sell_item method does not currently differentiate between the various item details (like category, price, etc.) as separate fields, which is required by the assignment.
+The __main__ block includes an example usage with a hardcoded UUID and address. In a complete implementation, you might want these to be configurable or passed in via command-line arguments.
+In summary, the seller.py script aligns with the provided assignment requirements but is missing the notification functionality and needs refinement for item detail specification in the sell_item method. Additionally, the script could benefit from more dynamic configuration for the seller's address and UUID. 
