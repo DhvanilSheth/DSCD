@@ -12,12 +12,12 @@ class SellerClient:
 
     def register_seller(self):
         request = shopping_platform_pb2.RegisterSellerRequest(
-            seller_address=self.seller_address, 
+            seller_address=self.seller_address,
             uuid=self.uuid
         )
         try:
             response = self.stub.RegisterSeller(request)
-            print(response.message)
+            print(f"RegisterSeller response: {response.message}")
         except grpc.RpcError as e:
             print(f"RegisterSeller failed with {e.code()}: {e.details()}")
 
@@ -32,7 +32,7 @@ class SellerClient:
         )
         try:
             response = self.stub.SellItem(request)
-            print(response.message)
+            print(f"SellItem response: {response.message}")
         except grpc.RpcError as e:
             print(f"SellItem failed with {e.code()}: {e.details()}")
 
@@ -45,7 +45,7 @@ class SellerClient:
         )
         try:
             response = self.stub.UpdateItem(request)
-            print(response.message)
+            print(f"UpdateItem response: {response.message}")
         except grpc.RpcError as e:
             print(f"UpdateItem failed with {e.code()}: {e.details()}")
 
@@ -56,7 +56,7 @@ class SellerClient:
         )
         try:
             response = self.stub.DeleteItem(request)
-            print(response.message)
+            print(f"DeleteItem response: {response.message}")
         except grpc.RpcError as e:
             print(f"DeleteItem failed with {e.code()}: {e.details()}")
 
@@ -67,17 +67,24 @@ class SellerClient:
         )
         try:
             for item in self.stub.DisplaySellerItems(request):
-                print(f"Item ID: {item.id}, Price: ${item.price}, Name: {item.name}, "
-                      f"Category: {item.category}, Description: {item.description}, "
-                      f"Quantity Remaining: {item.quantity}, Rating: {item.rating} / 5")
+                print(f"DisplayItems response - Item ID: {item.id}, Price: ${item.price}, Name: {item.name}, "
+                      f"Category: {shopping_platform_pb2.Category.Name(item.category)}, "
+                      f"Description: {item.description}, Quantity Remaining: {item.quantity}, "
+                      f"Rating: {item.rating} / 5")
         except grpc.RpcError as e:
             print(f"DisplaySellerItems failed with {e.code()}: {e.details()}")
 
+# Entry point for the seller client
 def run():
     seller = SellerClient('localhost:50051')
+    print("Seller client is running...")
     seller.register_seller()
     # Perform other operations such as sell_item, update_item, delete_item, display_items as needed
-    
+    # Example usage (uncomment to use):
+    # seller.sell_item("Laptop", shopping_platform_pb2.ELECTRONICS, 10, "Latest model", 999.99)
+    # seller.update_item(1, 899.99, 8)
+    # seller.delete_item(1)
+    # seller.display_items()
 
 if __name__ == '__main__':
     run()
