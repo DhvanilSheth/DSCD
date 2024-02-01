@@ -22,26 +22,30 @@ message Item {
   double rating = 8;
 }
 
-// Seller-related messages
+// Messages related to seller operations
 message RegisterSellerRequest {
-  string address = 1;
+  string seller_address = 1;
   string uuid = 2;
 }
 
 message SellerItemOperationRequest {
   string uuid = 1;
-  string address = 2;
-  Item item = 3;
+  int32 item_id = 2; // For update and delete operations
+  string name = 3; // For sell operation
+  Category category = 4; // For sell operation
+  int32 quantity = 5; // For sell and update operations
+  string description = 6; // For sell operation
+  double price = 7; // For sell and update operations
 }
 
 message DisplayItemsRequest {
-  string uuid = 1;
-  string address = 2;
+  string seller_address = 1;
+  string uuid = 2;
 }
 
-// Buyer-related messages
+// Messages related to buyer operations
 message SearchItemRequest {
-  string name = 1;
+  string name = 1; // Can be empty
   Category category = 2;
 }
 
@@ -58,8 +62,8 @@ message WishlistRequest {
 
 message RateItemRequest {
   int32 item_id = 1;
-  string buyer_address = 2;
-  int32 rating = 3;
+  int32 rating = 2; // Should be an integer between 1 and 5
+  string buyer_address = 3;
 }
 
 // Response and notification messages
@@ -68,19 +72,19 @@ message Response {
 }
 
 message NotifyClientRequest {
-  Item updated_item = 1;
+  Item item = 1;
 }
 
-// Service definition for Market
+// Service definition
 service MarketService {
-  rpc RegisterSeller(RegisterSellerRequest) returns (Response);
-  rpc SellItem(SellerItemOperationRequest) returns (Response);
-  rpc UpdateItem(SellerItemOperationRequest) returns (Response);
-  rpc DeleteItem(SellerItemOperationRequest) returns (Response);
-  rpc DisplaySellerItems(DisplayItemsRequest) returns (stream Item);
-  rpc SearchItem(SearchItemRequest) returns (stream Item);
-  rpc BuyItem(BuyItemRequest) returns (Response);
-  rpc AddToWishlist(WishlistRequest) returns (Response);
-  rpc RateItem(RateItemRequest) returns (Response);
-  rpc NotifyClient(stream NotifyClientRequest) returns (stream Response);
+  rpc RegisterSeller (RegisterSellerRequest) returns (Response);
+  rpc SellItem (SellerItemOperationRequest) returns (Response);
+  rpc UpdateItem (SellerItemOperationRequest) returns (Response);
+  rpc DeleteItem (SellerItemOperationRequest) returns (Response);
+  rpc DisplaySellerItems (DisplayItemsRequest) returns (stream Item);
+  rpc SearchItem (SearchItemRequest) returns (stream Item);
+  rpc BuyItem (BuyItemRequest) returns (Response);
+  rpc AddToWishlist (WishlistRequest) returns (Response);
+  rpc RateItem (RateItemRequest) returns (Response);
+  rpc NotifyClient (NotifyClientRequest) returns (Response);
 }
