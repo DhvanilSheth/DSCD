@@ -33,10 +33,9 @@ def message_listener(group_socket):
     while True:
         try:
             message = group_socket.recv_string(zmq.NOBLOCK)  # Non-blocking receive
-            if message:
-                print(f"New message received: {message}")
+            print(f"New message received: {message}")
         except zmq.Again:
-            pass  # No message received, can include a sleep time if desired
+            continue  # No message received
 
 def join_group(group_address):
     group_socket = context.socket(zmq.DEALER)
@@ -44,13 +43,13 @@ def join_group(group_address):
     group_socket.connect(group_address)
 
     listener_thread = threading.Thread(target=message_listener, args=(group_socket,))
-    listener_thread.daemon = True  # Daemonize thread
+    listener_thread.daemon = True
     listener_thread.start()
 
     join_request = {'operation': 'joinGroup', 'user_id': USER_ID.decode()}
     group_socket.send_json(join_request)
     response = group_socket.recv_string()
-    print(response)
+    print("Join group response:", response)
 
     return group_socket
 
@@ -58,46 +57,70 @@ def leave_group(group_socket):
     leave_request = {'operation': 'leaveGroup', 'user_id': USER_ID.decode()}
     group_socket.send_json(leave_request)
     response = group_socket.recv_string()
-    print(response)
+    print("Leave group response:", response)
     group_socket.close()
 
 def send_message(group_socket, message):
     send_request = {'operation': 'sendMessage', 'text': message, 'user_id': USER_ID.decode()}
     group_socket.send_json(send_request)
     response = group_socket.recv_string()
-    print(response)
+    print("Send message response:", response)
 
 def get_messages(group_socket, timestamp=None):
     get_request = {'operation': 'getMessage', 'timestamp': timestamp, 'user_id': USER_ID.decode()}
     group_socket.send_json(get_request)
     messages = group_socket.recv_string()
-    print(messages)
+    print("Messages received:", messages)
+
+def user_interface():
+    group_socket = None
+    while True:
+        print("\nMenu:")
+        print("1. Get list of groups")
+        print("2. Join a group")
+        print("3. Send a message")
+        print("4. Get messages")
+        print("5. Leave group")
+        print("6. Exit")
+        choice = input("Enter your choice: ")
+
+        if choice == "1":
+            groups = get_group_list()
+            print("Available groups:", json.dumps(groups, indent=2))
+        elif choice == "2":
+            if not group_socket:
+                group_address = input("Enter group address to join (e.g., tcp://localhost:5557): ")
+                group_socket = join_group(group_address)
+            else:
+                print("Already in a group. Please leave the current group before joining another.")
+        elif choice == "3":
+            if group_socket:
+                message = input("Enter message to send: ")
+                send_message(group_socket, message)
+            else:
+                print("Please join a group first.")
+        elif choice == "4":
+            if group_socket:
+                timestamp = input("Enter timestamp to get messages since (or press enter for all messages): ")
+                get_messages(group_socket, timestamp)
+            else:
+                print("Please join a group first.")
+        elif choice == "5":
+            if group_socket:
+                leave_group(group_socket)
+                group_socket = None
+            else:
+                print("Not currently in any group.")
+        elif choice == "6":
+            if group_socket:
+                leave_group(group_socket)
+            break
+        else:
+            print("Invalid choice. Please try again.")
 
 if __name__ == "__main__":
     try:
-        groups = get_group_list()
-        print(f"Available groups: {groups}")
-
-        # Example usage
-        # Join the first available group
-        if groups:
-            group_info = list(groups[0].values())[0]
-            group_socket = join_group(group_info['address'])
-
-            # Send a message to the group
-            send_message(group_socket, "Hello Group!")
-
-            # Get all messages from the group
-            get_messages(group_socket)
-
-            # Assuming some time passes and more messages are sent...
-            # Get messages after a specific timestamp
-            later_timestamp = datetime.now().strftime('%H:%M:%S')
-            get_messages(group_socket, later_timestamp)
-
-            # Leave the group
-            leave_group(group_socket)
-
+        user_interface()
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
