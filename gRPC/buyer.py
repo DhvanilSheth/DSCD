@@ -52,25 +52,49 @@ class BuyerClient:
     def close(self):
         self.channel.close()
 
-def main():
+def menu():
     address = 'localhost:50051'
     buyer = BuyerClient(address)
-    
-    # Example operations
-    buyer.search_item(name='', category=shopping_platform_pb2.Category.ANY)
-    buyer.buy_item(item_id=1, quantity=1, buyer_address='120.13.188.178:50051')
-    buyer.add_to_wishlist(item_id=1, buyer_address='120.13.188.178:50051')
-    buyer.rate_item(item_id=1, rating=5, buyer_address='120.13.188.178:50051')
-    
-    # Simulating receiving a notification for an updated item
-    updated_item = shopping_platform_pb2.Item(
-        id=1, name="iPhone", category=shopping_platform_pb2.Category.ELECTRONICS,
-        description="This is iPhone 15.", quantity=4, price=500.0, rating=4.3,
-        seller_address='192.13.188.178:50051'
-    )
-    buyer.receive_notification(updated_item)
-    
+
+    while True:
+        print("\nMenu:")
+        print("1. Search Item")
+        print("2. Buy Item")
+        print("3. Add Item to Wishlist")
+        print("4. Rate Item")
+        print("5. Exit")
+
+        choice = input("Enter your choice: ")
+
+        if choice == "1":
+            name = input("Enter item name: ")
+            category = input("Enter item category: ").upper()
+            buyer.search_item(name, category)
+
+        elif choice == "2":
+            item_id = int(input("Enter item ID: "))
+            quantity = int(input("Enter quantity: "))
+            buyer_address = input("Enter your address: ")
+            buyer.buy_item(item_id, quantity, buyer_address)
+
+        elif choice == "3":
+            item_id = int(input("Enter item ID: "))
+            buyer_address = input("Enter your address: ")
+            buyer.add_to_wishlist(item_id, buyer_address)
+
+        elif choice == "4":
+            item_id = int(input("Enter item ID: "))
+            rating = int(input("Enter your rating (1-5): "))
+            buyer_address = input("Enter your address: ")
+            buyer.rate_item(item_id, rating, buyer_address)
+
+        elif choice == "5":
+            break
+
+        else:
+            print("Invalid choice. Please try again.")
+
     buyer.close()
 
 if __name__ == '__main__':
-    main()
+    menu()
