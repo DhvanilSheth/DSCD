@@ -24,6 +24,7 @@ class SellerClient:
     def sell_item(self, name, category, quantity, description, price):
         request = shopping_platform_pb2.SellerItemOperationRequest(
             uuid=self.uuid,
+            # seller_address=self.seller_address,
             name=name,
             category=category,
             quantity=quantity,

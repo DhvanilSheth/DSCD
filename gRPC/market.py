@@ -30,7 +30,8 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
                 category=request.category,
                 quantity=request.quantity,
                 description=request.description,
-                seller_address=request.uuid,  # Storing UUID instead of seller address
+                seller_address=request.uuid, # address is taken as UUID 
+                # seller_address=self.sellers[request.uuid],
                 price=request.price,
                 rating=0  # Default rating
             )

@@ -12,7 +12,7 @@ class BuyerClient:
             for item in self.stub.SearchItem(shopping_platform_pb2.SearchItemRequest(name=name, category=category)):
                 print(f"\nItem ID: {item.id}, Price: ${item.price}, Name: {item.name}, Category: {item.category}, "
                       f"Description: {item.description}.\nQuantity Remaining: {item.quantity}\nRating: {item.rating} / 5  |  "
-                      f"Seller: {item.seller_address}\n")
+                      f"Seller: {item.seller_address}\n\n")
         except grpc.RpcError as e:
             print(f"An error occurred during SearchItem: {e}")
 

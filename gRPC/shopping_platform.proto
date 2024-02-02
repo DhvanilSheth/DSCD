@@ -88,3 +88,5 @@ service MarketService {
   rpc RateItem (RateItemRequest) returns (Response);
   rpc NotifyClient (NotifyClientRequest) returns (Response);
 }
+
+// to run : python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. shopping_platform.proto
