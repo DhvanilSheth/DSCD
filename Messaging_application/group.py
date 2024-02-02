@@ -2,14 +2,22 @@ import zmq
 import json
 import threading
 import uuid
+import argparse
 from datetime import datetime
 
+# Parse command-line arguments
+parser = argparse.ArgumentParser(description='Start a group server.')
+parser.add_argument('--name', type=str, required=True, help='Name of the group')
+parser.add_argument('--port', type=str, required=True, help='Port for the group server')
+parser.add_argument('--message_server_ip', type=str, default="localhost", help='IP address of the message server')
+parser.add_argument('--message_server_port', type=str, default="5555", help='Port of the message server registration service')
+args = parser.parse_args()
+
 # Constants
-MESSAGE_SERVER_IP = "localhost"
-MESSAGE_SERVER_REGISTRATION_PORT = "5555"
-GROUP_PORT = "5557"
-SUCCESS = "SUCCESS"
-FAILURE = "FAILURE"
+MESSAGE_SERVER_IP = args.message_server_ip
+MESSAGE_SERVER_REGISTRATION_PORT = args.message_server_port
+GROUP_PORT = args.port
+GROUP_NAME = args.name
 
 # ZeroMQ Context
 context = zmq.Context()
@@ -24,8 +32,8 @@ user_communication_socket.bind(f"tcp://*:{GROUP_PORT}")
 
 # Group information
 group_id = str(uuid.uuid4())
-group_name = "Group1"
-group_address = f"tcp://localhost:{GROUP_PORT}"
+group_name = GROUP_NAME
+group_address = f"tcp://{MESSAGE_SERVER_IP}:{GROUP_PORT}"
 
 # Data structure to maintain user list and messages
 user_tele = {}  # {user_id: user_socket}
@@ -38,7 +46,7 @@ def register_with_message_server():
         'address': group_address
     })
     response = registration_socket.recv_string()
-    if response == SUCCESS:
+    if response == "SUCCESS":
         print(f"Server registered successfully with ID {group_id}")
     else:
         print(f"Server registration failed with ID {group_id}")
@@ -56,12 +64,12 @@ def process_user_request(user_id, message):
     if operation == 'joinGroup':
         user_tele[user_id] = group_id
         print(f"JOIN REQUEST FROM {user_id.decode()}")
-        user_communication_socket.send_multipart([user_id, SUCCESS.encode()])
+        user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
 
     elif operation == 'leaveGroup':
         user_tele.pop(user_id, None)
         print(f"LEAVE REQUEST FROM {user_id.decode()}")
-        user_communication_socket.send_multipart([user_id, SUCCESS.encode()])
+        user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
 
     elif operation == 'getMessage':
         timestamp = message.get('timestamp')
@@ -75,9 +83,9 @@ def process_user_request(user_id, message):
             timestamp = datetime.now().strftime('%H:%M:%S')
             messages.append((timestamp, text))
             print(f"MESSAGE RECEIVED FROM {user_id.decode()}: {text}")
-            user_communication_socket.send_multipart([user_id, SUCCESS.encode()])
+            user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
         else:
-            user_communication_socket.send_multipart([user_id, FAILURE.encode()])
+            user_communication_socket.send_multipart([user_id, "FAILURE".encode()])
 
 def get_messages_since(timestamp):
     if timestamp:
@@ -86,5 +94,14 @@ def get_messages_since(timestamp):
         return messages
 
 if __name__ == "__main__":
-    register_with_message_server()
-    threading.Thread(target=handle_user_requests).start()
+    try:
+        register_with_message_server()
+        thread = threading.Thread(target=handle_user_requests)
+        thread.start()
+        thread.join()
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        registration_socket.close()
+        user_communication_socket.close()
+        context.term()
