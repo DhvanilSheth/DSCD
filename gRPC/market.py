@@ -23,44 +23,56 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         return shopping_platform_pb2.Response(message="SUCCESS")
 
     def SellItem(self, request, context):
-        item = shopping_platform_pb2.Item(
-            id=self.item_id_counter,
-            name=request.name,
-            category=request.category,
-            quantity=request.quantity,
-            description=request.description,
-            seller_address=request.uuid,  # Storing UUID instead of seller address
-            price=request.price,
-            rating=0  # Default rating
-        )
-        self.items[self.item_id_counter] = item
-        self.item_id_counter += 1
-        print(f"Sell Item request from {request.uuid}")
-        return shopping_platform_pb2.Response(message=str(item.id))
+        try:
+            item = shopping_platform_pb2.Item(
+                id=self.item_id_counter,
+                name=request.name,
+                category=request.category,
+                quantity=request.quantity,
+                description=request.description,
+                seller_address=request.uuid,  # Storing UUID instead of seller address
+                price=request.price,
+                rating=0  # Default rating
+            )
+            self.items[self.item_id_counter] = item
+            self.item_id_counter += 1
+            print(f"Sell Item request from {self.sellers[request.uuid]}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        except Exception as e:
+            return shopping_platform_pb2.Response(message="FAIL")
 
     def UpdateItem(self, request, context):
-        if request.item_id not in self.items or request.uuid != self.items[request.item_id].seller_address:
+        try: 
+            if request.item_id not in self.items or request.uuid != self.items[request.item_id].seller_address:
+                return shopping_platform_pb2.Response(message="FAIL")
+            item = self.items[request.item_id]
+            item.price = request.price
+            item.quantity = request.quantity
+            self._notify_clients_about_item_update(item)
+            print(f"Update Item {request.item_id} request from {self.sellers[request.uuid]}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        except Exception as e:
             return shopping_platform_pb2.Response(message="FAIL")
-        item = self.items[request.item_id]
-        item.price = request.price
-        item.quantity = request.quantity
-        self._notify_clients_about_item_update(item)
-        print(f"Update Item {request.item_id} request from {request.uuid}")
-        return shopping_platform_pb2.Response(message="SUCCESS")
 
     def DeleteItem(self, request, context):
-        if request.item_id in self.items and request.uuid == self.items[request.item_id].seller_address:
-            del self.items[request.item_id]
-            print(f"Delete Item {request.item_id} request from {request.uuid}")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        try:
+            if request.item_id in self.items and request.uuid == self.items[request.item_id].seller_address:
+                del self.items[request.item_id]
+                print(f"Delete Item {request.item_id} request from {self.sellers[request.uuid]}")
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL")
+        except Exception as e:
+            return shopping_platform_pb2.Response(message="FAIL")
 
     def DisplaySellerItems(self, request, context):
-        seller_uuid = request.uuid
-        for item in self.items.values():
-            if item.seller_address == seller_uuid:
-                print(f"Display Items request from {request.seller_address}")
-                yield item
+        try:
+            seller_uuid = request.uuid
+            for item in self.items.values():
+                if item.seller_address == seller_uuid:
+                    print(f"Display Items request from {self.sellers[request.uuid]}")
+                    yield item
+        except Exception as e:
+            return shopping_platform_pb2.Response(message="FAIL")
 
     def SearchItem(self, request, context):
         for item in self.items.values():
