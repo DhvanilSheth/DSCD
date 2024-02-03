@@ -37,7 +37,8 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
                 description=request.description,
                 seller_address=request.seller_address,
                 price=request.price,
-                rating=0  # Default rating
+                rating=0,  # Default rating
+                seller_uuid=request.uuid
             )
             self.items[self.item_id_counter] = item
             self.item_id_counter += 1
@@ -49,26 +50,29 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         seller_uuid, seller_address = request.uuid, request.seller_address
         if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
             item = self.items[request.item_id]
-            item.price = request.price
-            item.quantity = request.quantity
-            print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
-            self._notify_clients_about_item_update(item)
-            return shopping_platform_pb2.Response(message="SUCCESS")
+            if item.seller_address == seller_address and item.seller_uuid == seller_uuid:
+                item.price = request.price
+                item.quantity = request.quantity
+                print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
+                self._notify_clients_about_item_update(item)
+                return shopping_platform_pb2.Response(message="SUCCESS")
         return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DeleteItem(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
         if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
-            del self.items[request.item_id]
-            print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
-            return shopping_platform_pb2.Response(message="SUCCESS")
+            item = self.items[request.item_id]
+            if item.seller_address == seller_address and item.seller_uuid == seller_uuid:
+                del self.items[request.item_id]
+                print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
+                return shopping_platform_pb2.Response(message="SUCCESS")
         return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DisplaySellerItems(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
         if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             for item in self.items.values():
-                if item.seller_address == request.seller_address:
+                if item.seller_address == request.seller_address and item.seller_uuid == request.uuid:
                     print(f"Display Items request from {request.seller_address}, uuid = {request.uuid}")
                     yield item
         else:
