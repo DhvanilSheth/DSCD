@@ -3,6 +3,7 @@ from concurrent import futures
 import time
 import shopping_platform_pb2
 import shopping_platform_pb2_grpc
+import logging
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
@@ -18,12 +19,12 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
 
     def RegisterSeller(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
-        if seller_uuid in self.sellers_uuid or seller_address in self.sellers_address:
-            return shopping_platform_pb2.Response(message="FAIL: Seller already registered")
-        self.sellers_uuid[seller_uuid] = request
-        self.sellers_address[seller_address] = request
-        print(f"New seller registered: {seller_address}, uuid = {seller_uuid}")
-        return shopping_platform_pb2.Response(message="SUCCESS")
+        if seller_uuid not in self.sellers_uuid and seller_address not in self.sellers_address:
+            self.sellers_uuid[seller_uuid] = request
+            self.sellers_address[seller_address] = request
+            print(f"New seller registered: {request.seller_address}, uuid = {request.uuid}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Seller already registered")
 
     def SellItem(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
@@ -45,16 +46,6 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
 
     def UpdateItem(self, request, context):
-        # seller_uuid, seller_address = request.uuid, request.seller_address
-        # if request.item_id not in self.items or (seller_uuid not in self.sellers_uuid and seller_address not in self.sellers_address):
-        #     return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
-        # item = self.items[request.item_id]
-        # if item.seller_address != request.seller_address:
-        #     return shopping_platform_pb2.Response(message="FAIL: Unauthorized operation")
-        # item.price = request.price
-        # item.quantity = request.quantity
-        # print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
-        # return shopping_platform_pb2.Response(message="SUCCESS")
         seller_uuid, seller_address = request.uuid, request.seller_address
         if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
             item = self.items[request.item_id]
@@ -66,15 +57,6 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DeleteItem(self, request, context):
-        # seller_id = (request.uuid, request.seller_address)
-        # if request.item_id not in self.items or seller_id not in self.sellers:
-        #     return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
-        # item = self.items[request.item_id]
-        # if item.seller_address != request.seller_address:
-        #     return shopping_platform_pb2.Response(message="FAIL: Unauthorized operation")
-        # del self.items[request.item_id]
-        # print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
-        # return shopping_platform_pb2.Response(message="SUCCESS")
         seller_uuid, seller_address = request.uuid, request.seller_address
         if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
             del self.items[request.item_id]
@@ -83,13 +65,6 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DisplaySellerItems(self, request, context):
-        # seller_id = (request.uuid, request.seller_address)
-        # if seller_id not in self.sellers:
-        #     return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
-        # for item in self.items.values():
-        #     if item.seller_address == request.seller_address:
-        #         print(f"Display Items request from {request.seller_address}, uuid = {request.uuid}")
-        #         yield item
         seller_uuid, seller_address = request.uuid, request.seller_address
         if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             for item in self.items.values():
@@ -160,7 +135,7 @@ def serve():
     shopping_platform_pb2_grpc.add_MarketServiceServicer_to_server(Market(), server)
     server.add_insecure_port('0.0.0.0:50051')
     server.start()
-    print("Market server started on port 50051.")
+    print("Market server started listening on port 50051.")
     try:
         while True:
             time.sleep(_ONE_DAY_IN_SECONDS)
@@ -169,4 +144,5 @@ def serve():
         print("Market server stopped.")
 
 if __name__ == '__main__':
+    logging.basicConfig()
     serve()
