@@ -19,7 +19,7 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
 
     def RegisterSeller(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
-        if seller_uuid not in self.sellers_uuid and seller_address not in self.sellers_address:
+        if seller_uuid not in self.sellers_uuid or seller_address not in self.sellers_address:
             self.sellers_uuid[seller_uuid] = request
             self.sellers_address[seller_address] = request
             print(f"New seller registered: {request.seller_address}, uuid = {request.uuid}")

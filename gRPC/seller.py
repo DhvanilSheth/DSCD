@@ -81,6 +81,7 @@ class SellerClient:
 def menu():
     server_address = sys.argv[1] if len(sys.argv) > 1 else 'localhost:50051'
     seller = SellerClient(server_address)
+    print(f"UUID: {seller.uuid}")
     print("Seller client is running...")
     seller.register_seller()
     
