@@ -24,6 +24,7 @@ class SellerClient:
     def sell_item(self, name, category, quantity, description, price):
         request = shopping_platform_pb2.SellerItemOperationRequest(
             uuid=self.uuid,
+            # seller_address=self.seller_address,
             name=name,
             category=category,
             quantity=quantity,
@@ -75,10 +76,10 @@ class SellerClient:
             print(f"DisplaySellerItems failed with {e.code()}: {e.details()}")
 
 # Entry point for the seller client
-def run():
-    seller = SellerClient('localhost:50051')
-    print("Seller client is running...")
-    seller.register_seller()
+# def run():
+    # seller = SellerClient('localhost:50051')
+    # print("Seller client is running...")
+    # seller.register_seller()
     # Perform other operations such as sell_item, update_item, delete_item, display_items as needed
     # Example usage (uncomment to use):
     # seller.sell_item("Laptop", shopping_platform_pb2.ELECTRONICS, 10, "Latest model", 999.99)
@@ -86,5 +87,51 @@ def run():
     # seller.delete_item(1)
     # seller.display_items()
 
+def menu():
+    seller = SellerClient('localhost:50051')
+    print("Seller client is running...")
+    seller.register_seller()
+    
+    while True:
+        print("\nMenu:")
+        print("1. Sell Item")
+        print("2. Update Item")
+        print("3. Delete Item")
+        print("4. Display Items")
+        print("5. Exit")
+        
+        choice = input("Enter your choice: ")
+        
+        if choice == "1":
+            name = input("Enter item name: ") 
+            category = input("Enter item category: ")
+            category = category.upper()
+            quantity = int(input("Enter item quantity: "))
+            description = input("Enter item description: ")
+            price = float(input("Enter item price: "))
+            seller.sell_item(name, category, quantity, description, price)
+            
+        elif choice == "2":
+            item_id = int(input("Enter item ID: "))
+            price = float(input("Enter new price: "))
+            quantity = int(input("Enter new quantity: "))
+            seller.update_item(item_id, price, quantity)
+            
+        elif choice == "3":
+            item_id = int(input("Enter item ID: "))
+            seller.delete_item(item_id)
+            
+        elif choice == "4":
+            seller.display_items()
+            
+        elif choice == "5":
+            break
+            
+        else:
+            print("Invalid choice. Please try again.")
+
 if __name__ == '__main__':
-    run()
+    menu()
+
+# if __name__ == '__main__':
+#     run()
