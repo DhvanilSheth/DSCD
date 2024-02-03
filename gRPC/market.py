@@ -9,72 +9,96 @@ _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
     
     def __init__(self):
-        self.sellers = {}  # {uuid: seller_address}
+        self.sellers_address = {}  # {seller_address: seller_data}
+        self.sellers_uuid = {}  # {uuid: seller_data}
         self.items = {}  # {item_id: item}
         self.item_id_counter = 1
         self.wishlist = {}  # {item_id: [buyer_addresses]}
         self.item_ratings = {}  # {item_id: [ratings]}
 
     def RegisterSeller(self, request, context):
-        if request.uuid in self.sellers:
-            return shopping_platform_pb2.Response(message="FAIL")
-        self.sellers[request.uuid] = request.seller_address
-        print(f"Seller join request from {request.seller_address}, uuid = {request.uuid}")
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid in self.sellers_uuid or seller_address in self.sellers_address:
+            return shopping_platform_pb2.Response(message="FAIL: Seller already registered")
+        self.sellers_uuid[seller_uuid] = request
+        self.sellers_address[seller_address] = request
+        print(f"New seller registered: {seller_address}, uuid = {seller_uuid}")
         return shopping_platform_pb2.Response(message="SUCCESS")
 
     def SellItem(self, request, context):
-        try:
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             item = shopping_platform_pb2.Item(
                 id=self.item_id_counter,
                 name=request.name,
                 category=request.category,
                 quantity=request.quantity,
                 description=request.description,
-                seller_address=request.uuid, # address is taken as UUID 
-                # seller_address=self.sellers[request.uuid],
+                seller_address=request.seller_address,
                 price=request.price,
                 rating=0  # Default rating
             )
             self.items[self.item_id_counter] = item
             self.item_id_counter += 1
-            print(f"Sell Item request from {self.sellers[request.uuid]}")
+            print(f"New item added by {request.seller_address}, uuid = {request.uuid}")
             return shopping_platform_pb2.Response(message="SUCCESS")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
 
     def UpdateItem(self, request, context):
-        try: 
-            if request.item_id not in self.items or request.uuid != self.items[request.item_id].seller_address:
-                return shopping_platform_pb2.Response(message="FAIL")
+        # seller_uuid, seller_address = request.uuid, request.seller_address
+        # if request.item_id not in self.items or (seller_uuid not in self.sellers_uuid and seller_address not in self.sellers_address):
+        #     return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
+        # item = self.items[request.item_id]
+        # if item.seller_address != request.seller_address:
+        #     return shopping_platform_pb2.Response(message="FAIL: Unauthorized operation")
+        # item.price = request.price
+        # item.quantity = request.quantity
+        # print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
+        # return shopping_platform_pb2.Response(message="SUCCESS")
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
             item = self.items[request.item_id]
             item.price = request.price
             item.quantity = request.quantity
+            print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
             self._notify_clients_about_item_update(item)
-            print(f"Update Item {request.item_id} request from {self.sellers[request.uuid]}")
             return shopping_platform_pb2.Response(message="SUCCESS")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DeleteItem(self, request, context):
-        try:
-            if request.item_id in self.items and request.uuid == self.items[request.item_id].seller_address:
-                del self.items[request.item_id]
-                print(f"Delete Item {request.item_id} request from {self.sellers[request.uuid]}")
-                return shopping_platform_pb2.Response(message="SUCCESS")
-            return shopping_platform_pb2.Response(message="FAIL")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        # seller_id = (request.uuid, request.seller_address)
+        # if request.item_id not in self.items or seller_id not in self.sellers:
+        #     return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
+        # item = self.items[request.item_id]
+        # if item.seller_address != request.seller_address:
+        #     return shopping_platform_pb2.Response(message="FAIL: Unauthorized operation")
+        # del self.items[request.item_id]
+        # print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
+        # return shopping_platform_pb2.Response(message="SUCCESS")
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
+            del self.items[request.item_id]
+            print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DisplaySellerItems(self, request, context):
-        try:
-            seller_uuid = request.uuid
+        # seller_id = (request.uuid, request.seller_address)
+        # if seller_id not in self.sellers:
+        #     return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
+        # for item in self.items.values():
+        #     if item.seller_address == request.seller_address:
+        #         print(f"Display Items request from {request.seller_address}, uuid = {request.uuid}")
+        #         yield item
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             for item in self.items.values():
-                if item.seller_address == seller_uuid:
-                    print(f"Display Items request from {self.sellers[request.uuid]}")
+                if item.seller_address == request.seller_address:
+                    print(f"Display Items request from {request.seller_address}, uuid = {request.uuid}")
                     yield item
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
-
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
+        
     def SearchItem(self, request, context):
         for item in self.items.values():
             if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
@@ -134,7 +158,7 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     shopping_platform_pb2_grpc.add_MarketServiceServicer_to_server(Market(), server)
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port('0.0.0.0:50051')
     server.start()
     print("Market server started on port 50051.")
     try:

@@ -2,13 +2,14 @@ import grpc
 import shopping_platform_pb2
 import shopping_platform_pb2_grpc
 import uuid
-
+import sys
 class SellerClient:
+    
     def __init__(self, address):
-        channel = grpc.insecure_channel(address)
+        self.seller_address = address
+        channel = grpc.insecure_channel(self.seller_address)
         self.stub = shopping_platform_pb2_grpc.MarketServiceStub(channel)
         self.uuid = str(uuid.uuid1())
-        self.seller_address = address
 
     def register_seller(self):
         request = shopping_platform_pb2.RegisterSellerRequest(
@@ -24,7 +25,7 @@ class SellerClient:
     def sell_item(self, name, category, quantity, description, price):
         request = shopping_platform_pb2.SellerItemOperationRequest(
             uuid=self.uuid,
-            # seller_address=self.seller_address,
+            seller_address=self.seller_address,
             name=name,
             category=category,
             quantity=quantity,
@@ -40,6 +41,7 @@ class SellerClient:
     def update_item(self, item_id, price, quantity):
         request = shopping_platform_pb2.SellerItemOperationRequest(
             uuid=self.uuid,
+            seller_address=self.seller_address,
             item_id=item_id,
             price=price,
             quantity=quantity
@@ -53,6 +55,7 @@ class SellerClient:
     def delete_item(self, item_id):
         request = shopping_platform_pb2.SellerItemOperationRequest(
             uuid=self.uuid,
+            seller_address=self.seller_address,
             item_id=item_id
         )
         try:
@@ -75,20 +78,9 @@ class SellerClient:
         except grpc.RpcError as e:
             print(f"DisplaySellerItems failed with {e.code()}: {e.details()}")
 
-# Entry point for the seller client
-# def run():
-    # seller = SellerClient('localhost:50051')
-    # print("Seller client is running...")
-    # seller.register_seller()
-    # Perform other operations such as sell_item, update_item, delete_item, display_items as needed
-    # Example usage (uncomment to use):
-    # seller.sell_item("Laptop", shopping_platform_pb2.ELECTRONICS, 10, "Latest model", 999.99)
-    # seller.update_item(1, 899.99, 8)
-    # seller.delete_item(1)
-    # seller.display_items()
-
 def menu():
-    seller = SellerClient('localhost:50051')
+    server_address = sys.argv[1] if len(sys.argv) > 1 else 'localhost:50051'
+    seller = SellerClient(server_address)
     print("Seller client is running...")
     seller.register_seller()
     
@@ -132,6 +124,3 @@ def menu():
 
 if __name__ == '__main__':
     menu()
-
-# if __name__ == '__main__':
-#     run()

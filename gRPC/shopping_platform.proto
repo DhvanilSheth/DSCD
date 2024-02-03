@@ -20,6 +20,7 @@ message Item {
   string seller_address = 6;
   double price = 7;
   double rating = 8;
+  string seller_uuid = 9;
 }
 
 // Messages related to seller operations
@@ -30,12 +31,13 @@ message RegisterSellerRequest {
 
 message SellerItemOperationRequest {
   string uuid = 1;
-  int32 item_id = 2; // For update and delete operations
-  string name = 3; // For sell operation
-  Category category = 4; // For sell operation
-  int32 quantity = 5; // For sell and update operations
-  string description = 6; // For sell operation
-  double price = 7; // For sell and update operations
+  string seller_address = 2;
+  int32 item_id = 3; // For update and delete operations
+  string name = 4; // For sell operation
+  Category category = 5; // For sell operation
+  int32 quantity = 6; // For sell and update operations
+  string description = 7; // For sell operation
+  double price = 8; // For sell and update operations
 }
 
 message DisplayItemsRequest {
