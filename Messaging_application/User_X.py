@@ -20,20 +20,25 @@ USER_ID = args.user_id.encode()  # Encoding the UUID to bytes for ZeroMQ IDENTIT
 # ZeroMQ Context
 context = zmq.Context()
 
-# Socket to get the list of groups from the message server
-group_list_socket = context.socket(zmq.REQ)
-group_list_socket.connect(f"tcp://{MESSAGE_SERVER_IP}:{GROUP_LIST_PORT}")
+# Function to create and connect a REQ socket
+def connect_req_socket(ip, port):
+    socket = context.socket(zmq.REQ)
+    socket.connect(f"tcp://{ip}:{port}")
+    return socket
 
+# Function to get the list of groups from the server
 def get_group_list():
-    group_list_socket.send_string("GET_GROUP_LIST")
-    groups = group_list_socket.recv_string()
-    return json.loads(groups)
+    socket = connect_req_socket(MESSAGE_SERVER_IP, GROUP_LIST_PORT)
+    socket.send_string("GET_GROUP_LIST")
+    response = socket.recv_string()
+    socket.close()
+    return json.loads(response)
 
 def message_listener(group_socket):
     while True:
         try:
             message = group_socket.recv_string(zmq.NOBLOCK)  # Non-blocking receive
-            print(f"New message received: {message}")
+            print(f"\nNew message received: {message}")
         except zmq.Again:
             continue  # No message received
 
@@ -51,26 +56,37 @@ def join_group(group_address):
     response = group_socket.recv_string()
     print("Join group response:", response)
 
-    return group_socket
+    return group_socket, listener_thread
 
 def leave_group(group_socket):
-    leave_request = {'operation': 'leaveGroup', 'user_id': USER_ID.decode()}
-    group_socket.send_json(leave_request)
-    response = group_socket.recv_string()
-    print("Leave group response:", response)
-    group_socket.close()
+    if group_socket:
+        leave_request = {'operation': 'leaveGroup', 'user_id': USER_ID.decode()}
+        group_socket.send_json(leave_request)
+        response = group_socket.recv_string()
+        print("Leave group response:", response)
+        group_socket.close()
+        return None
+    else:
+        print("You are not in a group.")
+        return None
 
 def send_message(group_socket, message):
-    send_request = {'operation': 'sendMessage', 'text': message, 'user_id': USER_ID.decode()}
-    group_socket.send_json(send_request)
-    response = group_socket.recv_string()
-    print("Send message response:", response)
+    if group_socket:
+        send_request = {'operation': 'sendMessage', 'text': message, 'user_id': USER_ID.decode()}
+        group_socket.send_json(send_request)
+        response = group_socket.recv_string()
+        print("Send message response:", response)
+    else:
+        print("You need to join a group first.")
 
 def get_messages(group_socket, timestamp=None):
-    get_request = {'operation': 'getMessage', 'timestamp': timestamp, 'user_id': USER_ID.decode()}
-    group_socket.send_json(get_request)
-    messages = group_socket.recv_string()
-    print("Messages received:", messages)
+    if group_socket:
+        get_request = {'operation': 'getMessage', 'timestamp': timestamp, 'user_id': USER_ID.decode()}
+        group_socket.send_json(get_request)
+        messages = group_socket.recv_string()
+        print("Messages received:", messages)
+    else:
+        print("You need to join a group first.")
 
 def user_interface():
     group_socket = None
@@ -88,32 +104,23 @@ def user_interface():
             groups = get_group_list()
             print("Available groups:", json.dumps(groups, indent=2))
         elif choice == "2":
-            if not group_socket:
-                group_address = input("Enter group address to join (e.g., tcp://localhost:5557): ")
-                group_socket = join_group(group_address)
-            else:
+            if group_socket:
                 print("Already in a group. Please leave the current group before joining another.")
+            else:
+                group_address = input("Enter group address to join (e.g., tcp://localhost:5557): ")
+                group_socket, _ = join_group(group_address)
         elif choice == "3":
-            if group_socket:
-                message = input("Enter message to send: ")
-                send_message(group_socket, message)
-            else:
-                print("Please join a group first.")
+            message = input("Enter message to send: ")
+            send_message(group_socket, message)
         elif choice == "4":
-            if group_socket:
-                timestamp = input("Enter timestamp to get messages since (or press enter for all messages): ")
-                get_messages(group_socket, timestamp)
-            else:
-                print("Please join a group first.")
+            timestamp = input("Enter timestamp to get messages since (or press enter for all messages): ")
+            get_messages(group_socket, timestamp)
         elif choice == "5":
-            if group_socket:
-                leave_group(group_socket)
-                group_socket = None
-            else:
-                print("Not currently in any group.")
+            group_socket = leave_group(group_socket)
         elif choice == "6":
             if group_socket:
                 leave_group(group_socket)
+            print("Exiting...")
             break
         else:
             print("Invalid choice. Please try again.")
@@ -121,8 +128,9 @@ def user_interface():
 if __name__ == "__main__":
     try:
         user_interface()
+    except KeyboardInterrupt:
+        print("\nUser client exiting gracefully.")
     except Exception as e:
         print(f"An error occurred: {e}")
     finally:
-        group_list_socket.close()
         context.term()
