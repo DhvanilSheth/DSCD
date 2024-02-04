@@ -16,6 +16,7 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         self.item_id_counter = 1
         self.wishlist = {}  # {item_id: [buyer_addresses]}
         self.item_ratings = {}  # {item_id: [ratings]}
+        self.buyers_uuid = {}  # {uuid: buyer_data} 
 
     def RegisterSeller(self, request, context):
         seller_uuid, seller_address = request.uuid, request.seller_address
@@ -78,38 +79,83 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
         else:
             return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
         
+    def RegisterBuyer(self, request, context):
+        buyer_uuid = request.uuid
+        if buyer_uuid not in self.buyers_uuid:
+            self.buyers_uuid[buyer_uuid] = request
+            print(f"New buyer registered: uuid = {request.uuid}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Buyer already registered")
+
     def SearchItem(self, request, context):
-        for item in self.items.values():
-            if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
-                print(f"Search request for Item name: {request.name}, Category: {item.category}")
-                yield item
+        # for item in self.items.values():
+        #     if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
+        #         print(f"Search request for Item name: {request.name}, Category: {item.category} from user {request.buyer_uuid}")
+        #         yield item
+        if request.buyer_uuid in self.buyers_uuid:
+            for item in self.items.values():
+                if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
+                    print(f"Search request for Item name: {request.name}, Category: {shopping_platform_pb2.Category.Name(item.category)}  from user {request.buyer_uuid}")
+                    yield item
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def BuyItem(self, request, context):
-        if request.item_id in self.items and self.items[request.item_id].quantity >= request.quantity:
-            item = self.items[request.item_id]
-            item.quantity -= request.quantity
-            print(f"Buy request {request.quantity} of item {request.item_id}, from {request.buyer_address}")
-            self._notify_seller_about_purchase(item, request.quantity, request.buyer_address)
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        # if request.item_id in self.items and self.items[request.item_id].quantity >= request.quantity:
+        #     item = self.items[request.item_id]
+        #     item.quantity -= request.quantity
+        #     print(f"Buy request {request.quantity} of item {request.item_id}, from {request.buyer_address}")
+        #     self._notify_seller_about_purchase(item, request.quantity, request.buyer_address)
+        #     return shopping_platform_pb2.Response(message="SUCCESS")
+        # return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items and self.items[request.item_id].quantity >= request.quantity:
+                item = self.items[request.item_id]
+                item.quantity -= request.quantity
+                print(f"Buy request {request.quantity} of item {request.item_id}, from {request.buyer_uuid}")
+                self._notify_seller_about_purchase(item, request.quantity, request.buyer_uuid)
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found or insufficient quantity")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def AddToWishlist(self, request, context):
-        if request.item_id in self.items:
-            if request.item_id not in self.wishlist:
-                self.wishlist[request.item_id] = []
-            self.wishlist[request.item_id].append(request.buyer_address)
-            print(f"Wishlist request of item {request.item_id}, from {request.buyer_address}")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        # if request.item_id in self.items:
+        #     if request.item_id not in self.wishlist:
+        #         self.wishlist[request.item_id] = []
+        #     self.wishlist[request.item_id].append(request.buyer_address)
+        #     print(f"Wishlist request of item {request.item_id}, from {request.buyer_address}")
+        #     return shopping_platform_pb2.Response(message="SUCCESS")
+        # return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items:
+                if request.item_id not in self.wishlist:
+                    self.wishlist[request.item_id] = []
+                self.wishlist[request.item_id].append(request.buyer_uuid)
+                print(f"Wishlist request of item {request.item_id}, from {request.buyer_uuid}")
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def RateItem(self, request, context):
-        if request.item_id in self.items and 1 <= request.rating <= 5:
-            self.item_ratings.setdefault(request.item_id, []).append(request.rating)
-            avg_rating = sum(self.item_ratings[request.item_id]) / len(self.item_ratings[request.item_id])
-            self.items[request.item_id].rating = avg_rating
-            print(f"{request.buyer_address} rated item {request.item_id} with {request.rating} stars.")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        # if request.item_id in self.items and 1 <= request.rating <= 5:
+        #     self.item_ratings.setdefault(request.item_id, []).append(request.rating)
+        #     avg_rating = sum(self.item_ratings[request.item_id]) / len(self.item_ratings[request.item_id])
+        #     self.items[request.item_id].rating = avg_rating
+        #     print(f"{request.buyer_address} rated item {request.item_id} with {request.rating} stars.")
+        #     return shopping_platform_pb2.Response(message="SUCCESS")
+        # return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items and 1 <= request.rating <= 5:
+                self.item_ratings.setdefault(request.item_id, []).append(request.rating)
+                avg_rating = sum(self.item_ratings[request.item_id]) / len(self.item_ratings[request.item_id])
+                self.items[request.item_id].rating = avg_rating
+                print(f"{request.buyer_uuid} rated item {request.item_id} with {request.rating} stars.")
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid rating")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def _notify_clients_about_item_update(self, updated_item):
         if updated_item.id in self.wishlist:

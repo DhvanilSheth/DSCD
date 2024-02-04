@@ -46,26 +46,32 @@ message DisplayItemsRequest {
 }
 
 // Messages related to buyer operations
+
+message RegisterBuyerRequest {
+  string uuid = 1;
+}
+
 message SearchItemRequest {
   string name = 1; // Can be empty
   Category category = 2;
+  string buyer_uuid = 3;
 }
 
 message BuyItemRequest {
   int32 item_id = 1;
   int32 quantity = 2;
-  string buyer_address = 3;
+  string buyer_uuid = 3;
 }
 
 message WishlistRequest {
   int32 item_id = 1;
-  string buyer_address = 2;
+  string buyer_uuid = 2;
 }
 
 message RateItemRequest {
   int32 item_id = 1;
   int32 rating = 2; // Should be an integer between 1 and 5
-  string buyer_address = 3;
+  string buyer_uuid = 3;
 }
 
 // Response and notification messages
@@ -84,6 +90,7 @@ service MarketService {
   rpc UpdateItem (SellerItemOperationRequest) returns (Response);
   rpc DeleteItem (SellerItemOperationRequest) returns (Response);
   rpc DisplaySellerItems (DisplayItemsRequest) returns (stream Item);
+  rpc RegisterBuyer (RegisterBuyerRequest) returns (Response);
   rpc SearchItem (SearchItemRequest) returns (stream Item);
   rpc BuyItem (BuyItemRequest) returns (Response);
   rpc AddToWishlist (WishlistRequest) returns (Response);
