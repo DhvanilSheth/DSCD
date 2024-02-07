@@ -83,6 +83,16 @@ message NotifyClientRequest {
   Item item = 1;
 }
 
+// Message types for notifications
+message NotificationRequest {
+    string uuid = 1;  // The UUID of the seller
+}
+
+message Notification {
+    string message = 1;
+    Item item = 2;  // Include the item details in notifications
+}
+
 // Service definition
 service MarketService {
   rpc RegisterSeller (RegisterSellerRequest) returns (Response);
@@ -96,6 +106,7 @@ service MarketService {
   rpc AddToWishlist (WishlistRequest) returns (Response);
   rpc RateItem (RateItemRequest) returns (Response);
   rpc NotifyClient (NotifyClientRequest) returns (Response);
+  rpc RegisterNotificationStream(stream NotificationRequest) returns (stream Notification);
 }
 
 // to run : python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. shopping_platform.proto

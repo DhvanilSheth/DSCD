@@ -3,6 +3,7 @@ import shopping_platform_pb2
 import shopping_platform_pb2_grpc
 import uuid
 import sys
+import threading
 class SellerClient:
     
     def __init__(self, address):
@@ -78,9 +79,28 @@ class SellerClient:
         except grpc.RpcError as e:
             print(f"DisplaySellerItems failed with {e.code()}: {e.details()}")
 
+    # This function establishes a stream with the server to receive notifications
+    def open_notification_stream(self):
+        responses = self.stub.RegisterNotificationStream(self.generate_notifications())
+        for response in responses:
+            print("Notification received:", response)
+
+    # This is a generator function needed to create a request iterator
+    def generate_notifications(self):
+        while True:
+            try:
+                yield shopping_platform_pb2.NotificationRequest(uuid=self.uuid)
+            except Exception as e:
+                print(f"Error: {e}")
+                break        
+
 def menu():
     server_address = sys.argv[1] if len(sys.argv) > 1 else 'localhost:50051'
     seller = SellerClient(server_address)
+
+    notification_thread = threading.Thread(target=seller.open_notification_stream)
+    notification_thread.start()
+
     print(f"UUID: {seller.uuid}")
     print("Seller client is running...")
     seller.register_seller()
