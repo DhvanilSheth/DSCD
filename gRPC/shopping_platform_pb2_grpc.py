@@ -40,6 +40,11 @@ class MarketServiceStub(object):
                 request_serializer=shopping__platform__pb2.DisplayItemsRequest.SerializeToString,
                 response_deserializer=shopping__platform__pb2.Item.FromString,
                 )
+        self.RegisterBuyer = channel.unary_unary(
+                '/shoppingplatform.MarketService/RegisterBuyer',
+                request_serializer=shopping__platform__pb2.RegisterBuyerRequest.SerializeToString,
+                response_deserializer=shopping__platform__pb2.Response.FromString,
+                )
         self.SearchItem = channel.unary_stream(
                 '/shoppingplatform.MarketService/SearchItem',
                 request_serializer=shopping__platform__pb2.SearchItemRequest.SerializeToString,
@@ -96,6 +101,12 @@ class MarketServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def DisplaySellerItems(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RegisterBuyer(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -158,6 +169,11 @@ def add_MarketServiceServicer_to_server(servicer, server):
                     servicer.DisplaySellerItems,
                     request_deserializer=shopping__platform__pb2.DisplayItemsRequest.FromString,
                     response_serializer=shopping__platform__pb2.Item.SerializeToString,
+            ),
+            'RegisterBuyer': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterBuyer,
+                    request_deserializer=shopping__platform__pb2.RegisterBuyerRequest.FromString,
+                    response_serializer=shopping__platform__pb2.Response.SerializeToString,
             ),
             'SearchItem': grpc.unary_stream_rpc_method_handler(
                     servicer.SearchItem,
@@ -277,6 +293,23 @@ class MarketService(object):
         return grpc.experimental.unary_stream(request, target, '/shoppingplatform.MarketService/DisplaySellerItems',
             shopping__platform__pb2.DisplayItemsRequest.SerializeToString,
             shopping__platform__pb2.Item.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def RegisterBuyer(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/shoppingplatform.MarketService/RegisterBuyer',
+            shopping__platform__pb2.RegisterBuyerRequest.SerializeToString,
+            shopping__platform__pb2.Response.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

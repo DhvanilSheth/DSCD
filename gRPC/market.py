@@ -3,110 +3,134 @@ from concurrent import futures
 import time
 import shopping_platform_pb2
 import shopping_platform_pb2_grpc
+import logging
 
 _ONE_DAY_IN_SECONDS = 60 * 60 * 24
 
 class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
     
     def __init__(self):
-        self.sellers = {}  # {uuid: seller_address}
+        self.sellers_address = {}  # {seller_address: seller_data}
+        self.sellers_uuid = {}  # {uuid: seller_data}
         self.items = {}  # {item_id: item}
         self.item_id_counter = 1
         self.wishlist = {}  # {item_id: [buyer_addresses]}
         self.item_ratings = {}  # {item_id: [ratings]}
+        self.buyers_uuid = {}  # {uuid: buyer_data} 
 
     def RegisterSeller(self, request, context):
-        if request.uuid in self.sellers:
-            return shopping_platform_pb2.Response(message="FAIL")
-        self.sellers[request.uuid] = request.seller_address
-        print(f"Seller join request from {request.seller_address}, uuid = {request.uuid}")
-        return shopping_platform_pb2.Response(message="SUCCESS")
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid not in self.sellers_uuid or seller_address not in self.sellers_address:
+            self.sellers_uuid[seller_uuid] = request
+            self.sellers_address[seller_address] = request
+            print(f"New seller registered: {request.seller_address}, uuid = {request.uuid}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Seller already registered")
 
     def SellItem(self, request, context):
-        try:
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             item = shopping_platform_pb2.Item(
                 id=self.item_id_counter,
                 name=request.name,
                 category=request.category,
                 quantity=request.quantity,
                 description=request.description,
-                seller_address=request.uuid, # address is taken as UUID 
-                # seller_address=self.sellers[request.uuid],
+                seller_address=request.seller_address,
                 price=request.price,
-                rating=0  # Default rating
+                rating=0,  # Default rating
+                seller_uuid=request.uuid
             )
             self.items[self.item_id_counter] = item
             self.item_id_counter += 1
-            print(f"Sell Item request from {self.sellers[request.uuid]}")
+            print(f"New item added by {request.seller_address}, uuid = {request.uuid}")
             return shopping_platform_pb2.Response(message="SUCCESS")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
 
     def UpdateItem(self, request, context):
-        try: 
-            if request.item_id not in self.items or request.uuid != self.items[request.item_id].seller_address:
-                return shopping_platform_pb2.Response(message="FAIL")
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
             item = self.items[request.item_id]
-            item.price = request.price
-            item.quantity = request.quantity
-            self._notify_clients_about_item_update(item)
-            print(f"Update Item {request.item_id} request from {self.sellers[request.uuid]}")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+            if item.seller_address == seller_address and item.seller_uuid == seller_uuid:
+                item.price = request.price
+                item.quantity = request.quantity
+                print(f"Item {request.item_id} updated by {request.seller_address}, uuid = {request.uuid}")
+                self._notify_clients_about_item_update(item)
+                return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DeleteItem(self, request, context):
-        try:
-            if request.item_id in self.items and request.uuid == self.items[request.item_id].seller_address:
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if request.item_id in self.items and (seller_uuid in self.sellers_uuid and seller_address in self.sellers_address):
+            item = self.items[request.item_id]
+            if item.seller_address == seller_address and item.seller_uuid == seller_uuid:
                 del self.items[request.item_id]
-                print(f"Delete Item {request.item_id} request from {self.sellers[request.uuid]}")
+                print(f"Item {request.item_id} deleted by {request.seller_address}, uuid = {request.uuid}")
                 return shopping_platform_pb2.Response(message="SUCCESS")
-            return shopping_platform_pb2.Response(message="FAIL")
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid seller credentials")
 
     def DisplaySellerItems(self, request, context):
-        try:
-            seller_uuid = request.uuid
+        seller_uuid, seller_address = request.uuid, request.seller_address
+        if seller_uuid in self.sellers_uuid and seller_address in self.sellers_address:
             for item in self.items.values():
-                if item.seller_address == seller_uuid:
-                    print(f"Display Items request from {self.sellers[request.uuid]}")
+                if item.seller_address == request.seller_address and item.seller_uuid == request.uuid:
+                    print(f"Display Items request from {request.seller_address}, uuid = {request.uuid}")
                     yield item
-        except Exception as e:
-            return shopping_platform_pb2.Response(message="FAIL")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Seller not registered or invalid credentials")
+        
+    def RegisterBuyer(self, request, context):
+        buyer_uuid = request.uuid
+        if buyer_uuid not in self.buyers_uuid:
+            self.buyers_uuid[buyer_uuid] = request
+            print(f"New buyer registered: uuid = {request.uuid}")
+            return shopping_platform_pb2.Response(message="SUCCESS")
+        return shopping_platform_pb2.Response(message="FAIL: Buyer already registered")
 
     def SearchItem(self, request, context):
-        for item in self.items.values():
-            if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
-                print(f"Search request for Item name: {request.name}, Category: {item.category}")
-                yield item
+        if request.buyer_uuid in self.buyers_uuid:
+            for item in self.items.values():
+                if (request.name in item.name or not request.name) and (item.category == request.category or request.category == shopping_platform_pb2.Category.ANY):
+                    print(f"Search request for Item name: {request.name}, Category: {shopping_platform_pb2.Category.Name(item.category)}  from user {request.buyer_uuid}")
+                    yield item
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def BuyItem(self, request, context):
-        if request.item_id in self.items and self.items[request.item_id].quantity >= request.quantity:
-            item = self.items[request.item_id]
-            item.quantity -= request.quantity
-            print(f"Buy request {request.quantity} of item {request.item_id}, from {request.buyer_address}")
-            self._notify_seller_about_purchase(item, request.quantity, request.buyer_address)
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items and self.items[request.item_id].quantity >= request.quantity:
+                item = self.items[request.item_id]
+                item.quantity -= request.quantity
+                print(f"Buy request {request.quantity} of item {request.item_id}, from {request.buyer_uuid}")
+                self._notify_seller_about_purchase(item, request.quantity, request.buyer_uuid)
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found or insufficient quantity")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def AddToWishlist(self, request, context):
-        if request.item_id in self.items:
-            if request.item_id not in self.wishlist:
-                self.wishlist[request.item_id] = []
-            self.wishlist[request.item_id].append(request.buyer_address)
-            print(f"Wishlist request of item {request.item_id}, from {request.buyer_address}")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items:
+                if request.item_id not in self.wishlist:
+                    self.wishlist[request.item_id] = []
+                self.wishlist[request.item_id].append(request.buyer_uuid)
+                print(f"Wishlist request of item {request.item_id}, from {request.buyer_uuid}")
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def RateItem(self, request, context):
-        if request.item_id in self.items and 1 <= request.rating <= 5:
-            self.item_ratings.setdefault(request.item_id, []).append(request.rating)
-            avg_rating = sum(self.item_ratings[request.item_id]) / len(self.item_ratings[request.item_id])
-            self.items[request.item_id].rating = avg_rating
-            print(f"{request.buyer_address} rated item {request.item_id} with {request.rating} stars.")
-            return shopping_platform_pb2.Response(message="SUCCESS")
-        return shopping_platform_pb2.Response(message="FAIL")
+        if request.buyer_uuid in self.buyers_uuid:
+            if request.item_id in self.items and 1 <= request.rating <= 5:
+                self.item_ratings.setdefault(request.item_id, []).append(request.rating)
+                avg_rating = sum(self.item_ratings[request.item_id]) / len(self.item_ratings[request.item_id])
+                self.items[request.item_id].rating = avg_rating
+                print(f"{request.buyer_uuid} rated item {request.item_id} with {request.rating} stars.")
+                return shopping_platform_pb2.Response(message="SUCCESS")
+            return shopping_platform_pb2.Response(message="FAIL: Item not found or invalid rating")
+        else:
+            return shopping_platform_pb2.Response(message="FAIL: Buyer not registered or invalid credentials")
 
     def _notify_clients_about_item_update(self, updated_item):
         if updated_item.id in self.wishlist:
@@ -131,12 +155,36 @@ class Market(shopping_platform_pb2_grpc.MarketServiceServicer):
               f"Seller: {request.item.seller_address}\n#######")
         return shopping_platform_pb2.Response(message="NOTIFICATION_SENT")
 
+    # Function to call when a seller registers to store their notification stream
+    def RegisterNotificationStream(self, request_iterator, context):
+        seller_uuid = ''
+        for new_notification in request_iterator:
+            seller_uuid = new_notification.uuid  # Assume this contains the seller's UUID
+            self.seller_streams[seller_uuid] = context
+        # Once the stream is finished, remove it from the dictionary
+        if seller_uuid in self.seller_streams:
+            del self.seller_streams[seller_uuid]
+        return
+    
+    # Function to call when you want to notify sellers
+    def _notify_sellers_about_item_update(self, item_id):
+        if item_id in self.items:
+            item = self.items[item_id]
+            seller_uuid = item.seller_uuid
+            if seller_uuid in self.seller_streams:
+                try:
+                    notification = shopping_platform_pb2.Notification(message="Item updated", item=item)
+                    self.seller_streams[seller_uuid].send(notification)
+                except Exception as e:
+                    print(f"Error sending notification to seller {seller_uuid}: {e}")
+  
+
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     shopping_platform_pb2_grpc.add_MarketServiceServicer_to_server(Market(), server)
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port('0.0.0.0:50051')
     server.start()
-    print("Market server started on port 50051.")
+    print("Market server started listening on port 50051.")
     try:
         while True:
             time.sleep(_ONE_DAY_IN_SECONDS)
@@ -145,4 +193,5 @@ def serve():
         print("Market server stopped.")
 
 if __name__ == '__main__':
+    logging.basicConfig()
     serve()
