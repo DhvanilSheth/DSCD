@@ -1,107 +1,110 @@
 import zmq
-import json
 import threading
-import uuid
-import argparse
+import json
+import sys
 from datetime import datetime
 
-# Parse command-line arguments
-parser = argparse.ArgumentParser(description='Start a group server.')
-parser.add_argument('--name', type=str, required=True, help='Name of the group')
-parser.add_argument('--port', type=str, required=True, help='Port for the group server')
-parser.add_argument('--message_server_ip', type=str, default="localhost", help='IP address of the message server')
-parser.add_argument('--message_server_port', type=str, default="5555", help='Port of the message server registration service')
-args = parser.parse_args()
+class GroupServer:
+    def __init__(self, group_name, message_server_endpoint, group_port):
+        self.group_name = group_name
+        self.message_server_endpoint = message_server_endpoint
+        self.group_port = group_port  # Add this line to save the group_port as an instance attribute
+        self.context = zmq.Context()
+        self.group_socket = self.context.socket(zmq.REP)
+        self.group_socket.bind(f"tcp://*:{group_port}")
+        self.users = {}
+        self.messages = []
 
-# Constants
-MESSAGE_SERVER_IP = args.message_server_ip
-MESSAGE_SERVER_REGISTRATION_PORT = args.message_server_port
-GROUP_PORT = args.port
-GROUP_NAME = args.name
+    def register_with_message_server(self):
+        """Register the group with the central message server."""
+        message_server_socket = self.context.socket(zmq.REQ)
+        message_server_socket.connect(self.message_server_endpoint)
+        # Use self.group_port which is now correctly defined
+        full_address = f"tcp://localhost:{self.group_port}"
+        message_server_socket.send_json({
+            'action': 'register',
+            'group_name': self.group_name,
+            'group_address': full_address
+        })
+        response = message_server_socket.recv_json()
+        message_server_socket.close()
+        return response
+    
+    def handle_join_request(self, user_uuid):
+        """Handle a join request from a user."""
+        if user_uuid not in self.users:
+            self.users[user_uuid] = None  # Placeholder for user socket
+            return "SUCCESS"
+        return "FAIL"
 
-# ZeroMQ Context
-context = zmq.Context()
+    def handle_leave_request(self, user_uuid):
+        """Handle a leave request from a user."""
+        if user_uuid in self.users:
+            del self.users[user_uuid]
+            print(f"LEAVE REQUEST FROM {user_uuid} [UUID OF USER]")
+            return "SUCCESS"
+        return "FAIL"
 
-# Socket to register with message server
-registration_socket = context.socket(zmq.REQ)
-registration_socket.connect(f"tcp://{MESSAGE_SERVER_IP}:{MESSAGE_SERVER_REGISTRATION_PORT}")
+    def handle_send_message(self, user_uuid, message):
+        """Handle sending a message from a user."""
+        if user_uuid in self.users:
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            self.messages.append((timestamp, user_uuid, message))
+            print(f"MESSAGE FROM {user_uuid}: {message}")
+            return "SUCCESS"
+        return "FAIL"
 
-# Socket to communicate with users
-user_communication_socket = context.socket(zmq.ROUTER)
-user_communication_socket.bind(f"tcp://*:{GROUP_PORT}")
+    def handle_get_message(self, user_uuid, timestamp=None):
+        """Handle a request to get messages."""
+        if user_uuid not in self.users:
+            return "FAIL"
+        filtered_messages = [msg for msg in self.messages if timestamp is None or msg[0] >= timestamp]
+        print(f"MESSAGES REQUESTED BY {user_uuid}")
+        return json.dumps(filtered_messages)
 
-# Group information
-group_id = str(uuid.uuid4())
-group_name = GROUP_NAME
-group_address = f"tcp://{MESSAGE_SERVER_IP}:{GROUP_PORT}"
+    def serve_user_requests(self):
+        """Serve incoming requests from users."""
+        while True:
+            message = self.group_socket.recv_json()
+            action = message['action']
+            user_uuid = message['user_uuid']
+            response = ""
 
-# Data structure to maintain user list and messages
-user_tele = {}  # {user_id: user_socket}
-messages = []  # [(timestamp, message)]
+            if action == 'join':
+                response = self.handle_join_request(user_uuid)
+                print(f"JOIN REQUEST FROM {user_uuid} [UUID OF USER]")
+            elif action == 'leave':
+                response = self.handle_leave_request(user_uuid)
+            elif action == 'send_message':
+                response = self.handle_send_message(user_uuid, message['message'])
+            elif action == 'get_message':
+                response = self.handle_get_message(user_uuid, message.get('timestamp'))
+            else:
+                response = "INVALID REQUEST"
 
-def register_with_message_server():
-    registration_socket.send_json({
-        'id': group_id,
-        'name': group_name,
-        'address': group_address
-    })
-    response = registration_socket.recv_string()
-    if response == "SUCCESS":
-        print(f"Server registered successfully with ID {group_id}")
-    else:
-        print(f"Server registration failed with ID {group_id}")
+            self.group_socket.send_json({"response": response})
 
-def handle_user_requests():
-    while True:
-        # Use a new thread for each user request
-        user_id, message = user_communication_socket.recv_multipart()
-        threading.Thread(target=process_user_request, args=(user_id, message)).start()
+    def run(self):
+        """Run the group server."""
+        register_response = self.register_with_message_server()
+        print(f"Registration with message server: {register_response['response']}")
 
-def process_user_request(user_id, message):
-    message = json.loads(message.decode())
-    operation = message['operation']
+        user_request_thread = threading.Thread(target=self.serve_user_requests)
+        user_request_thread.start()
+        user_request_thread.join()
 
-    if operation == 'joinGroup':
-        user_tele[user_id] = group_id
-        print(f"JOIN REQUEST FROM {user_id.decode()}")
-        user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
-
-    elif operation == 'leaveGroup':
-        user_tele.pop(user_id, None)
-        print(f"LEAVE REQUEST FROM {user_id.decode()}")
-        user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
-
-    elif operation == 'getMessage':
-        timestamp = message.get('timestamp')
-        messages_to_send = get_messages_since(timestamp)
-        response = json.dumps(messages_to_send)
-        user_communication_socket.send_multipart([user_id, response.encode()])
-
-    elif operation == 'sendMessage':
-        if user_id in user_tele:
-            text = message['text']
-            timestamp = datetime.now().strftime('%H:%M:%S')
-            messages.append((timestamp, text))
-            print(f"MESSAGE RECEIVED FROM {user_id.decode()}: {text}")
-            user_communication_socket.send_multipart([user_id, "SUCCESS".encode()])
-        else:
-            user_communication_socket.send_multipart([user_id, "FAILURE".encode()])
-
-def get_messages_since(timestamp):
-    if timestamp:
-        return [msg for msg in messages if msg[0] >= timestamp]
-    else:
-        return messages
+        self.group_socket.close()
+        self.context.term()
 
 if __name__ == "__main__":
-    try:
-        register_with_message_server()
-        thread = threading.Thread(target=handle_user_requests)
-        thread.start()
-        thread.join()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        registration_socket.close()
-        user_communication_socket.close()
-        context.term()
+    if len(sys.argv) != 4:
+        print("Usage: python group_server.py <group_name> <message_server_endpoint> <group_port>")
+        sys.exit(1)
+
+    group_name = sys.argv[1]
+    message_server_endpoint = sys.argv[2]
+    group_port = sys.argv[3]
+
+    server = GroupServer(group_name, message_server_endpoint, group_port)
+    print(f"Group Server '{group_name}' started on port {group_port}...")
+    server.run()
