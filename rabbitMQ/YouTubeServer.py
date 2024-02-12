@@ -1,81 +1,113 @@
 import pika
+import threading
 import json
+import time
 
-class YouTubeServer:
-    def __init__(self):
-        self.connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
-        self.channel = self.connection.channel()
+# Global storage for user data and notifications
+users_data = {}  # Structure: {username: {'subscriptions': set(), 'notifications': []}}
+youtubers_data = {}  # Structure: {youtuber_name: ['video1', 'video2', ...]}
 
-        # Declare the exchange and queues
-        self.channel.exchange_declare(exchange='direct_logs', exchange_type='direct')
+def create_channel():
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    return connection, channel
 
-        # User requests queue
-        self.channel.queue_declare(queue='user_requests')
-        self.channel.queue_bind(exchange='direct_logs', queue='user_requests', routing_key='user')
+def notify_users(youtuber, video_name):
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
 
-        # YouTuber requests queue
-        self.channel.queue_declare(queue='youtuber_requests')
-        self.channel.queue_bind(exchange='direct_logs', queue='youtuber_requests', routing_key='youtuber')
+    for username, data in users_data.items():
+        if youtuber in data['subscriptions']:
+            notification = f"{youtuber} uploaded {video_name}"
+            data['notifications'].append(notification)
+            
+            # Define user-specific notification queue
+            personal_queue = f'notifications_{username}'
+            channel.queue_declare(queue=personal_queue)
 
-        self.users = {}
-        self.videos = {}
+            # Publish the notification to the user's personal queue
+            channel.basic_publish(
+                exchange='',
+                routing_key=personal_queue,
+                body=json.dumps({'user': username, 'message': notification})
+            )
+            print(f"Notification sent to {username}: {notification}")
 
-    def consume_user_requests(self):
-        def callback(ch, method, properties, body):
-            user_request = json.loads(body)
-            username = user_request['user']
-            if user_request['action'] == 'login':
-                print(f"{username} logged in")
-                # Send the notifications for the videos uploaded while user was logged out
-                for youtuber in self.users.get(username, {}).get('subscriptions', []):
-                    for video in self.videos.get(youtuber, []):
-                        self.notify_users(username, youtuber, video)
-            elif user_request['action'] in ['subscribe', 'unsubscribe']:
-                action = 'subscribed' if user_request['action'] == 'subscribe' else 'unsubscribed'
-                youtuber = user_request['youtuber']
-                self.update_subscription(username, youtuber, user_request['action'] == 'subscribe')
-                print(f"{username} {action} to {youtuber}")
+    connection.close()
 
-        self.channel.basic_consume(queue='user_requests', on_message_callback=callback, auto_ack=True)
-        print('YouTubeServer is now consuming user requests...')
-        self.channel.start_consuming()
+def consume_user_requests():
+    connection, channel = create_channel()
 
-    def consume_youtuber_requests(self):
-        def callback(ch, method, properties, body):
-            youtuber_request = json.loads(body)
-            youtuber_name = youtuber_request['youtuber']
-            video_name = youtuber_request['video']
-            self.add_video(youtuber_name, video_name)
-            print(f"{youtuber_name} uploaded {video_name}")
-            # Notify all subscribers of this youtuber
-            for user in self.users:
-                if youtuber_name in self.users[user].get('subscriptions', []):
-                    self.notify_users(user, youtuber_name, video_name)
+    channel.queue_declare(queue='user_requests')
 
-        self.channel.basic_consume(queue='youtuber_requests', on_message_callback=callback, auto_ack=True)
-        print('YouTubeServer is now consuming youtuber requests...')
-        self.channel.start_consuming()
+    def callback(ch, method, properties, body):
+        user_request = json.loads(body)
+        username = user_request['user']
 
-    def update_subscription(self, username, youtuber, subscribe):
-        if username not in self.users:
-            self.users[username] = {'subscriptions': []}
-        if subscribe:
-            self.users[username]['subscriptions'].append(youtuber)
+        # Initialize user data if new
+        if username not in users_data:
+            users_data[username] = {'subscriptions': set(), 'notifications': []}
+            print(f"{username} joined the platform!")
+
+        if 'youtuber' in user_request:
+            youtuber_name = user_request['youtuber']
+            if user_request['subscribe']:
+                users_data[username]['subscriptions'].add(youtuber_name)
+                action = 'subscribed'
+            else:
+                users_data[username]['subscriptions'].remove(youtuber_name)
+                action = 'unsubscribed'
+            print(f"{username} {action} to {youtuber_name}")
         else:
-            self.users[username]['subscriptions'].remove(youtuber)
+            # User logged in, print notifications if any
+            print(f"{username} logged in")
+            for notification in users_data[username]['notifications']:
+                print(f"Notification for {username}: {notification}")
+            # Clear notifications after showing them
+            users_data[username]['notifications'] = []
 
-    def add_video(self, youtuber_name, video_name):
-        if youtuber_name not in self.videos:
-            self.videos[youtuber_name] = []
-        self.videos[youtuber_name].append(video_name)
+    while True:
+        method_frame, header_frame, body = channel.basic_get('user_requests')
+        if method_frame:
+            callback(channel, method_frame, header_frame, body)
+            channel.basic_ack(method_frame.delivery_tag)
+        else:
+            time.sleep(1)  # Wait for 1 second before checking the queue again
 
-    def notify_users(self, username, youtuber_name, video_name):
-        print(f"Notification: {username}, {youtuber_name} uploaded {video_name}")
+def consume_youtuber_requests():
+    connection, channel = create_channel()
 
-    def start_server(self):
-        self.consume_user_requests()
-        self.consume_youtuber_requests()
+    channel.queue_declare(queue='youtuber_uploads')
 
-if __name__ == '__main__':
-    server = YouTubeServer()
-    server.start_server()
+    def callback(ch, method, properties, body):
+        upload_request = json.loads(body)
+        youtuber_name = upload_request['youtuber']
+        video_name = upload_request['video']
+
+        # Initialize youtuber data if new
+        if youtuber_name not in youtubers_data:
+            youtubers_data[youtuber_name] = []
+        youtubers_data[youtuber_name].append(video_name)
+
+        print(f"{youtuber_name} uploaded {video_name}")
+        notify_users(youtuber_name, video_name)
+
+    while True:
+        method_frame, header_frame, body = channel.basic_get('youtuber_uploads')
+        if method_frame:
+            callback(channel, method_frame, header_frame, body)
+            channel.basic_ack(method_frame.delivery_tag)
+        else:
+            time.sleep(1)  # Wait for 1 second before checking the queue again
+
+if __name__ == "__main__":
+    user_thread = threading.Thread(target=consume_user_requests)
+    user_thread.daemon = True
+    user_thread.start()
+
+    youtuber_thread = threading.Thread(target=consume_youtuber_requests)
+    youtuber_thread.daemon = True
+    youtuber_thread.start()
+
+    user_thread.join()
+    youtuber_thread.join()
