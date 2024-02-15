@@ -1,64 +1,47 @@
 import zmq
 import json
-from collections import defaultdict
 
-# Constants
-REGISTRATION_PORT = "5555"
-GROUP_LIST_PORT = "5556"
-SUCCESS = "SUCCESS"
-FAILURE = "FAILURE"
+class MessageServer:
+    def __init__(self, port=5555):
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.REP)
+        self.socket.bind(f"tcp://*:{port}")
+        self.groups = {}  # Dictionary to store group info, e.g., {group_name: group_address}
 
-# ZeroMQ Context
-context = zmq.Context()
+    def register_group(self, group_name, group_address):
+        """Register a new group with the server."""
+        if group_name not in self.groups:
+            self.groups[group_name] = group_address
+            print(f"JOIN REQUEST FROM {group_address} [IP: PORT]")
+            return "SUCCESS"
+        return "FAIL"
 
-# Socket to handle group server registration
-registration_socket = context.socket(zmq.REP)
-registration_socket.bind(f"tcp://*:{REGISTRATION_PORT}")
+    def list_groups(self):
+        """Provide a list of registered groups."""
+        return json.dumps(self.groups)
 
-# Socket to handle group list requests
-group_list_socket = context.socket(zmq.REP)
-group_list_socket.bind(f"tcp://*:{GROUP_LIST_PORT}")
+    def run(self):
+        """Run the message server."""
+        try:
+            while True:
+                # Wait for the next request from a client
+                message = self.socket.recv_json()
+                if message['action'] == 'register':
+                    response = self.register_group(message['group_name'], message['group_address'])
+                elif message['action'] == 'list_groups':
+                    response = self.list_groups()
+                else:
+                    response = "INVALID REQUEST"
 
-# Data structure to maintain the group information
-groups = defaultdict(dict)  # {group_id: {'name': group_name, 'address': ip_address}}
-
-def register_group(data):
-    group_id = data['id']
-    group_name = data['name']
-    ip_address = data['address']
-    if group_id not in groups:
-        groups[group_id] = {'name': group_name, 'address': ip_address}
-        print(f"JOIN REQUEST FROM {ip_address} [ID: {group_id}]")
-        return SUCCESS
-    else:
-        return FAILURE
-
-def get_group_list():
-    return json.dumps([{group_id: group_info} for group_id, group_info in groups.items()])
-
-def process_registration_requests():
-    while True:
-        # Wait for next request from group server
-        message = registration_socket.recv_json()
-        response = register_group(message)
-        registration_socket.send_string(response)
-
-def process_group_list_requests():
-    while True:
-        # Wait for next request from user
-        message = group_list_socket.recv_string()
-        if message == "GET_GROUP_LIST":
-            response = get_group_list()
-            group_list_socket.send_string(response)
+                # Send the reply back to the client
+                self.socket.send_json({"response": response})
+        except KeyboardInterrupt:
+            print("Message server is shutting down...")
+        finally:
+            self.socket.close()
+            self.context.term()
 
 if __name__ == "__main__":
-    try:
-        # Start processing registration and group list requests
-        process_registration_requests()
-        process_group_list_requests()
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
-        registration_socket.close()
-        group_list_socket.close()
-        context.term()
+    server = MessageServer()
+    print("Message Server started...")
+    server.run()
