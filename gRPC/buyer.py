@@ -2,15 +2,41 @@ import grpc
 import shopping_platform_pb2
 import shopping_platform_pb2_grpc
 import sys
-import uuid 
+import uuid
+from concurrent import futures
+
+# Notification service implementation for the buyer
+class NotificationServiceServicer(shopping_platform_pb2_grpc.NotificationServiceServicer):
+    def NotifyClient(self, request, context):
+        print("\n#######\nNotification Received:")
+        print(f"Message: {request.message}")
+        if request.item.id:  # Checking if item details are included in the notification
+            print(f"Item ID: {request.item.id}, Name: {request.item.name}, Price: {request.item.price}, "
+                  f"Quantity: {request.item.quantity}, Rating: {request.item.rating} / 5")
+        print("#######")
+        return shopping_platform_pb2.Response(message="Notification received successfully.")
+
 class BuyerClient:
-    def __init__(self, address):
+    def __init__(self, address, notification_port):
         self.channel = grpc.insecure_channel(address)
         self.stub = shopping_platform_pb2_grpc.MarketServiceStub(self.channel)
         self.buyer_uuid = str(uuid.uuid1())
+        self.notification_port = notification_port
+        self.start_notification_server()
+
+    def start_notification_server(self):
+        # Start a server to listen for notifications
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        shopping_platform_pb2_grpc.add_NotificationServiceServicer_to_server(NotificationServiceServicer(), self.server)
+        self.server.add_insecure_port(f'[::]:{self.notification_port}')
+        self.server.start()
+        print(f"Notification server started for buyer on port {self.notification_port}.")
 
     def register_buyer(self):
-        request = shopping_platform_pb2.RegisterBuyerRequest(uuid=self.buyer_uuid)
+        request = shopping_platform_pb2.RegisterBuyerRequest(
+            buyer_uuid=self.buyer_uuid,
+            notification_endpoint=f'localhost:{self.notification_port}'
+        )
         try:
             response = self.stub.RegisterBuyer(request)
             print(f"RegisterBuyer response: {response.message}")
@@ -50,21 +76,14 @@ class BuyerClient:
         except grpc.RpcError as e:
             print(f"An error occurred during RateItem: {e}")
 
-    # Function to simulate receiving notifications from the market
-    def receive_notification(self, updated_item):
-        # This would be a callback or part of a streaming RPC in a real-world scenario
-        # For the assignment, we will print the notification to simulate this process
-        print("#######\nThe Following Item has been updated:")
-        print(f"Item ID: {updated_item.id}, Price: ${updated_item.price}, Name: {updated_item.name}, Category: {updated_item.category},\n"
-              f"Description: {updated_item.description}.\nQuantity Remaining: {updated_item.quantity}\n"
-              f"Rating: {updated_item.rating} / 5  |  Seller: {updated_item.seller_address}\n#######")
-
     def close(self):
+        self.server.stop(None)  # Properly stop the notification server
         self.channel.close()
 
 def menu():
     server_address = sys.argv[1] if len(sys.argv) > 1 else 'localhost:50051'
-    buyer = BuyerClient(server_address)
+    notification_port = sys.argv[2] if len(sys.argv) > 2 else '50052'
+    buyer = BuyerClient(server_address, notification_port)
     print(f"UUID: {buyer.buyer_uuid}")
     print("Buyer client is running...")
     buyer.register_buyer()

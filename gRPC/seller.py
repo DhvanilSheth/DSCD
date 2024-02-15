@@ -2,20 +2,42 @@ import grpc
 import shopping_platform_pb2
 import shopping_platform_pb2_grpc
 import uuid
+from concurrent import futures
 import sys
-import threading
+
+# This class is for handling incoming notifications as a server
+class NotificationServiceServicer(shopping_platform_pb2_grpc.NotificationServiceServicer):
+    def NotifyClient(self, request, context):
+        print("\n#######\nNotification Received:")
+        print(f"Message: {request.message}")
+        if request.item.id:  # Check if item details are included in the notification
+            print(f"Item ID: {request.item.id}, Name: {request.item.name}, Price: {request.item.price}, "
+                  f"Quantity: {request.item.quantity}, Rating: {request.item.rating} / 5")
+        print("#######")
+        return shopping_platform_pb2.Response(message="Notification received successfully.")
+
+
 class SellerClient:
-    
-    def __init__(self, address):
+    def __init__(self, address, notification_port):
         self.seller_address = address
-        channel = grpc.insecure_channel(self.seller_address)
-        self.stub = shopping_platform_pb2_grpc.MarketServiceStub(channel)
+        self.notification_port = notification_port
+        self.channel = grpc.insecure_channel(self.seller_address)
+        self.stub = shopping_platform_pb2_grpc.MarketServiceStub(self.channel)
         self.uuid = str(uuid.uuid1())
+        self.start_notification_server()
+
+    def start_notification_server(self):
+        self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        shopping_platform_pb2_grpc.add_NotificationServiceServicer_to_server(NotificationServiceServicer(), self.server)
+        self.server.add_insecure_port(f'[::]:{self.notification_port}')
+        self.server.start()
+        print(f"Notification server started on port {self.notification_port}.")
 
     def register_seller(self):
         request = shopping_platform_pb2.RegisterSellerRequest(
             seller_address=self.seller_address,
-            uuid=self.uuid
+            uuid=self.uuid,
+            notification_endpoint=f'localhost:{self.notification_port}'  # Providing notification endpoint
         )
         try:
             response = self.stub.RegisterSeller(request)
@@ -78,44 +100,33 @@ class SellerClient:
                       f"Rating: {item.rating} / 5")
         except grpc.RpcError as e:
             print(f"DisplaySellerItems failed with {e.code()}: {e.details()}")
-
-    # This function establishes a stream with the server to receive notifications
-    def open_notification_stream(self):
-        responses = self.stub.RegisterNotificationStream(self.generate_notifications())
-        for response in responses:
-            print("Notification received:", response)
-
-    # This is a generator function needed to create a request iterator
-    def generate_notifications(self):
-        while True:
-            try:
-                yield shopping_platform_pb2.NotificationRequest(uuid=self.uuid)
-            except Exception as e:
-                print(f"Error: {e}")
-                break        
+    
+    def close(self):
+        self.server.stop(0)
+        self.channel.close()
 
 def menu():
     server_address = sys.argv[1] if len(sys.argv) > 1 else 'localhost:50051'
-    seller = SellerClient(server_address)
-
-    notification_thread = threading.Thread(target=seller.open_notification_stream)
-    notification_thread.start()
-
+    notification_port = sys.argv[2] if len(sys.argv) > 2 else '50052'  # Default notification port
+    seller = SellerClient(server_address, notification_port)
     print(f"UUID: {seller.uuid}")
     print("Seller client is running...")
-    seller.register_seller()
     
     while True:
         print("\nMenu:")
-        print("1. Sell Item")
-        print("2. Update Item")
-        print("3. Delete Item")
-        print("4. Display Items")
-        print("5. Exit")
+        print("1. Register Seller")
+        print("2. Sell Item")
+        print("3. Update Item")
+        print("4. Delete Item")
+        print("5. Display Items")
+        print("6. Exit")
         
         choice = input("Enter your choice: ")
         
         if choice == "1":
+            seller.register_seller()
+
+        elif choice == "2":
             name = input("Enter item name: ") 
             category = input("Enter item category: ")
             category = category.upper()
@@ -124,24 +135,26 @@ def menu():
             price = float(input("Enter item price: "))
             seller.sell_item(name, category, quantity, description, price)
             
-        elif choice == "2":
+        elif choice == "3":
             item_id = int(input("Enter item ID: "))
             price = float(input("Enter new price: "))
             quantity = int(input("Enter new quantity: "))
             seller.update_item(item_id, price, quantity)
             
-        elif choice == "3":
+        elif choice == "4":
             item_id = int(input("Enter item ID: "))
             seller.delete_item(item_id)
             
-        elif choice == "4":
+        elif choice == "5":
             seller.display_items()
             
-        elif choice == "5":
+        elif choice == "6":
             break
             
         else:
             print("Invalid choice. Please try again.")
+        
+    seller.close()
 
 if __name__ == '__main__':
     menu()

@@ -6,7 +6,7 @@ import shopping_platform_pb2 as shopping__platform__pb2
 
 
 class MarketServiceStub(object):
-    """Service definition
+    """Service definitions
     """
 
     def __init__(self, channel):
@@ -65,15 +65,10 @@ class MarketServiceStub(object):
                 request_serializer=shopping__platform__pb2.RateItemRequest.SerializeToString,
                 response_deserializer=shopping__platform__pb2.Response.FromString,
                 )
-        self.NotifyClient = channel.unary_unary(
-                '/shoppingplatform.MarketService/NotifyClient',
-                request_serializer=shopping__platform__pb2.NotifyClientRequest.SerializeToString,
-                response_deserializer=shopping__platform__pb2.Response.FromString,
-                )
 
 
 class MarketServiceServicer(object):
-    """Service definition
+    """Service definitions
     """
 
     def RegisterSeller(self, request, context):
@@ -136,12 +131,6 @@ class MarketServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def NotifyClient(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_MarketServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -195,11 +184,6 @@ def add_MarketServiceServicer_to_server(servicer, server):
                     request_deserializer=shopping__platform__pb2.RateItemRequest.FromString,
                     response_serializer=shopping__platform__pb2.Response.SerializeToString,
             ),
-            'NotifyClient': grpc.unary_unary_rpc_method_handler(
-                    servicer.NotifyClient,
-                    request_deserializer=shopping__platform__pb2.NotifyClientRequest.FromString,
-                    response_serializer=shopping__platform__pb2.Response.SerializeToString,
-            ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
             'shoppingplatform.MarketService', rpc_method_handlers)
@@ -208,7 +192,7 @@ def add_MarketServiceServicer_to_server(servicer, server):
 
  # This class is part of an EXPERIMENTAL API.
 class MarketService(object):
-    """Service definition
+    """Service definitions
     """
 
     @staticmethod
@@ -381,6 +365,50 @@ class MarketService(object):
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
+
+class NotificationServiceStub(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def __init__(self, channel):
+        """Constructor.
+
+        Args:
+            channel: A grpc.Channel.
+        """
+        self.NotifyClient = channel.unary_unary(
+                '/shoppingplatform.NotificationService/NotifyClient',
+                request_serializer=shopping__platform__pb2.NotificationMessage.SerializeToString,
+                response_deserializer=shopping__platform__pb2.Response.FromString,
+                )
+
+
+class NotificationServiceServicer(object):
+    """Missing associated documentation comment in .proto file."""
+
+    def NotifyClient(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+
+def add_NotificationServiceServicer_to_server(servicer, server):
+    rpc_method_handlers = {
+            'NotifyClient': grpc.unary_unary_rpc_method_handler(
+                    servicer.NotifyClient,
+                    request_deserializer=shopping__platform__pb2.NotificationMessage.FromString,
+                    response_serializer=shopping__platform__pb2.Response.SerializeToString,
+            ),
+    }
+    generic_handler = grpc.method_handlers_generic_handler(
+            'shoppingplatform.NotificationService', rpc_method_handlers)
+    server.add_generic_rpc_handlers((generic_handler,))
+
+
+ # This class is part of an EXPERIMENTAL API.
+class NotificationService(object):
+    """Missing associated documentation comment in .proto file."""
+
     @staticmethod
     def NotifyClient(request,
             target,
@@ -392,8 +420,8 @@ class MarketService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/shoppingplatform.MarketService/NotifyClient',
-            shopping__platform__pb2.NotifyClientRequest.SerializeToString,
+        return grpc.experimental.unary_unary(request, target, '/shoppingplatform.NotificationService/NotifyClient',
+            shopping__platform__pb2.NotificationMessage.SerializeToString,
             shopping__platform__pb2.Response.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
