@@ -1,8 +1,9 @@
 import zmq
 import sys
+import uuid
 import json
 from datetime import datetime
-import uuid
+import re
 
 class UserClient:
     def __init__(self, message_server_endpoint):
@@ -11,89 +12,84 @@ class UserClient:
         self.context = zmq.Context()
         self.server_socket = self.context.socket(zmq.REQ)
         self.server_socket.connect(message_server_endpoint)
-        self.group_sockets = {}  # Dictionary to store group sockets
-        self.groups = {} 
-
+        self.group_sockets = {}  # {group_address: zmq_socket}
 
     def get_group_list(self):
-        """Request the list of available groups from the message server."""
-        self.server_socket.send_json({'action': 'list_groups'})
+        """Fetches the list of available groups from the message server."""
+        self.server_socket.send_json({'action': 'list_groups', 'user_uuid': self.user_uuid})
         response = self.server_socket.recv_json()
-        return json.loads(response['response'])
-
-    def refresh_group_list(self):
-        """Refresh the cached list of groups from the message server."""
-        self.groups = self.get_group_list()
-
-    def join_group_by_address(self, group_address):
-        """Join a group using the group's address, if it is registered."""
-        # Refresh the list of groups from the message server
-        self.refresh_group_list()
-
-        # Normalize the address to ensure the protocol is included
-        if not group_address.startswith("tcp://"):
-            group_address = f"tcp://{group_address}"
-
-        # Check if the provided address is in the list of registered groups
-        if group_address not in self.groups.values():
-            print(f"The group with address {group_address} is not registered with the server.")
-            return
-
-        # Proceed with joining the group
-        group_socket = self.context.socket(zmq.REQ)
-        group_socket.connect(group_address)
-        group_socket.send_json({'action': 'join', 'user_uuid': self.user_uuid})
-        response = group_socket.recv_json()
-        if response['response'] == "SUCCESS":
-            # The address is being used as a unique identifier for the group
-            self.group_sockets[group_address] = group_socket
-            print(f"Joining {group_address}: {response['response']}")
+        if response:
+            print("Available groups:")
+            for group_name, group_address in response.items():
+                print(f"{group_name} - {group_address}")
         else:
-            print(f"Failed to join {group_address}: {response['response']}")
+            print("No groups available or message server is down.")
+
+    def join_group(self, group_address):
+        """Joins a group specified by its address."""
+        if group_address not in self.group_sockets:
+            group_socket = self.context.socket(zmq.REQ)
+            group_socket.connect(group_address)
+            group_socket.send_json({'action': 'join', 'user_uuid': self.user_uuid})
+            response = group_socket.recv_json()
+            if response['response'] == 'SUCCESS':
+                self.group_sockets[group_address] = group_socket
+                print("Joined group successfully.")
+            else:
+                print("Failed to join group.")
+        else:
+            print("Already joined the group.")
 
     def leave_group(self, group_address):
-    """Leave a specified group."""
-    if group_address in self.group_sockets:
-        group_socket = self.group_sockets[group_address]
-        group_socket.send_json({'action': 'leave', 'user_uuid': self.user_uuid})
-        response = group_socket.recv_json()
-        group_socket.close()
-        del self.group_sockets[group_address]
-        print(f"Leaving group {group_address}: {response['response']}")
-    else:
-        print("Not a member of the specified group.")
+        """Leaves a group specified by its address."""
+        if group_address in self.group_sockets:
+            group_socket = self.group_sockets[group_address]
+            group_socket.send_json({'action': 'leave', 'user_uuid': self.user_uuid})
+            response = group_socket.recv_json()
+            if response['response'] == 'SUCCESS':
+                group_socket.close()
+                del self.group_sockets[group_address]
+                print("Left group successfully.")
+            else:
+                print("Failed to leave group.")
+        else:
+            print("Not a member of this group.")
 
     def send_message(self, group_address, message):
-        """Send a message to a specified group."""
+        """Sends a message to the specified group."""
         if group_address in self.group_sockets:
             group_socket = self.group_sockets[group_address]
             group_socket.send_json({'action': 'send_message', 'user_uuid': self.user_uuid, 'message': message})
             response = group_socket.recv_json()
-            print(f"Sending message to {group_address}: {response['response']}")
+            print(f"Message send status: {response['response']}")
         else:
-            print("Not a member of the specified group.")
+            print("Must join the group before sending messages.")
 
-    def get_messages(self, group_address, timestamp=None):
-        """Get messages from a specified group."""
+    def get_messages(self, group_address):
+        """Fetches messages from the specified group."""
         if group_address in self.group_sockets:
+            timestamp = input("Enter timestamp (YYYY-MM-DD HH:MM:SS) for filtered messages or press Enter for all: ").strip()
+            # Validate timestamp format or use None for all messages
+            formatted_timestamp = timestamp if re.match(r'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}', timestamp) else None
+
             group_socket = self.group_sockets[group_address]
-            request = {'action': 'get_message', 'user_uuid': self.user_uuid}
-            if timestamp:
-                request['timestamp'] = timestamp
-            group_socket.send_json(request)
+            group_socket.send_json({'action': 'get_messages', 'user_uuid': self.user_uuid, 'timestamp': formatted_timestamp})
             response = group_socket.recv_json()
-            messages = json.loads(response['response'])
-            for msg in messages:
-                print(f"{msg[0]} - {msg[1]}: {msg[2]}")
+            if response['response'] == 'SUCCESS':
+                print("Messages from group:")
+                for msg in response['messages']:
+                    print(f"{msg[0]} - {msg[1]}: {msg[2]}")
+            else:
+                print("Failed to get messages.")
         else:
-            print("Not a member of the specified group.")
+            print("Must join the group to fetch messages.")
 
     def run(self):
-        """Run the user client interface."""
+        """Runs the user client, providing an interactive menu."""
         print(f"Your User UUID is: {self.user_uuid}")
         while True:
-            print("\nMenu:")
-            print("1: Get list of groups")
+            print("\nOptions:")
+            print("1: List available groups")
             print("2: Join group")
             print("3: Leave group")
             print("4: Send message")
@@ -102,32 +98,20 @@ class UserClient:
             choice = input("Enter option: ")
 
             if choice == "1":
-                self.groups = self.get_group_list()
-                print("Available groups:")
-                for group_name, group_address in self.groups.items():
-                    print(f"{group_name} - {group_address}")
+                self.get_group_list()
             elif choice == "2":
-                # Before allowing to join, ensure we have the latest list of groups
-                self.refresh_group_list()
                 group_address = input("Enter the full address of the group to join (e.g., tcp://localhost:5556): ")
-                self.join_group_by_address(group_address)
+                self.join_group(group_address)
             elif choice == "3":
-                group_name = input("Enter group name to leave: ")
-                self.leave_group(group_name)
+                group_address = input("Enter the full address of the group to leave: ")
+                self.leave_group(group_address)
             elif choice == "4":
-                group_name = input("Enter group name to send message: ")
-                if group_name in self.groups:
-                    message = input("Enter message: ")
-                    self.send_message(group_name, message)
-                else:
-                    print("You are not a member of this group or it does not exist.")
+                group_address = input("Enter the full address of the group to send a message to: ")
+                message = input("Enter your message: ")
+                self.send_message(group_address, message)
             elif choice == "5":
-                group_name = input("Enter group name to get messages: ")
-                if group_name in self.groups:
-                    timestamp = input("Enter timestamp (HH:MM:SS) or leave blank for all messages: ")
-                    self.get_messages(group_name, timestamp)
-                else:
-                    print("You are not a member of this group or it does not exist.")
+                group_address = input("Enter the full address of the group to get messages from: ")
+                self.get_messages(group_address)
             elif choice == "0":
                 print("Exiting...")
                 for socket in self.group_sockets.values():
@@ -136,7 +120,7 @@ class UserClient:
                 self.context.term()
                 break
             else:
-                print("Invalid option, please try again.")
+                print("Invalid option. Please try again.")
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
@@ -144,6 +128,5 @@ if __name__ == "__main__":
         sys.exit(1)
 
     message_server_endpoint = sys.argv[1]
-
     client = UserClient(message_server_endpoint)
     client.run()
