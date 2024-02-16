@@ -4,13 +4,14 @@ import shopping_platform_pb2_grpc
 import uuid
 from concurrent import futures
 import sys
+import socket
 
 # This class is for handling incoming notifications as a server
 class NotificationServiceServicer(shopping_platform_pb2_grpc.NotificationServiceServicer):
     def NotifyClient(self, request, context):
         print("\n#######\nNotification Received:")
         print(f"Message: {request.message}")
-        if request.item.id:  # Check if item details are included in the notification
+        if request.item.id:
             print(f"Item ID: {request.item.id}, Name: {request.item.name}, Price: {request.item.price}, "
                   f"Quantity: {request.item.quantity}, Rating: {request.item.rating} / 5")
         print("#######")
@@ -24,20 +25,34 @@ class SellerClient:
         self.channel = grpc.insecure_channel(self.seller_address)
         self.stub = shopping_platform_pb2_grpc.MarketServiceStub(self.channel)
         self.uuid = str(uuid.uuid1())
+        self.notification_ip = self.get_local_ip_address()
         self.start_notification_server()
+
+    def get_local_ip_address(self):
+        # Attempt to find the external IP address of this machine
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            # This doesn't actually make a request but is a trick to get the IP address
+            s.connect(('10.255.255.255', 1))
+            IP = s.getsockname()[0]
+        except Exception:
+            IP = '127.0.0.1'
+        finally:
+            s.close()
+        return IP
 
     def start_notification_server(self):
         self.server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         shopping_platform_pb2_grpc.add_NotificationServiceServicer_to_server(NotificationServiceServicer(), self.server)
-        self.server.add_insecure_port(f'[::]:{self.notification_port}')
+        self.server.add_insecure_port(f'{self.notification_ip}:{self.notification_port}')
         self.server.start()
-        print(f"Notification server started on port {self.notification_port}.")
+        print(f"Notification server started for seller on {self.notification_ip}:{self.notification_port}.")
 
     def register_seller(self):
         request = shopping_platform_pb2.RegisterSellerRequest(
             seller_address=self.seller_address,
             uuid=self.uuid,
-            notification_endpoint=f'localhost:{self.notification_port}'  # Providing notification endpoint
+            notification_endpoint=f'{self.notification_ip}:{self.notification_port}'
         )
         try:
             response = self.stub.RegisterSeller(request)
