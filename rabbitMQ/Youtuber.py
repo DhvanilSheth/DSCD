@@ -3,7 +3,9 @@ import sys
 import json
 
 def publish_video(youtuber, video_name):
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    credentials = pika.PlainCredentials('instance-2', 'vhavle')
+    parameters = pika.ConnectionParameters('10.128.0.2', 5672, '/', credentials)
+    connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     
     channel.queue_declare(queue='youtuber_uploads')
