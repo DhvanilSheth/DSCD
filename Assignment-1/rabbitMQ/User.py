@@ -3,7 +3,9 @@ import sys
 import json
 
 def send_user_request(username, youtuber=None, subscribe=None):
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    credentials = pika.PlainCredentials('instance-2', 'vhavle')
+    parameters = pika.ConnectionParameters('10.128.0.2', 5672, '/', credentials)
+    connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
     channel.queue_declare(queue='user_requests')
@@ -19,7 +21,9 @@ def send_user_request(username, youtuber=None, subscribe=None):
     connection.close()
 
 def receive_notifications(username):
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    credentials = pika.PlainCredentials('instance-2', 'vhavle')
+    parameters = pika.ConnectionParameters('10.128.0.2', 5672, '/', credentials)
+    connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
 
     # Declare a personal queue for the user to receive direct messages

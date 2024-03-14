@@ -8,12 +8,14 @@ users_data = {}  # Structure: {username: {'subscriptions': set(), 'notifications
 youtubers_data = {}  # Structure: {youtuber_name: ['video1', 'video2', ...]}
 
 def create_channel():
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    credentials = pika.PlainCredentials('instance-2', 'vhavle')  # Replace with your username and password
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', 5672, '/', credentials))
     channel = connection.channel()
     return connection, channel
 
 def notify_users(youtuber, video_name):
-    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    credentials = pika.PlainCredentials('instance-2', 'vhavle')  # Replace with your username and password
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost', 5672, '/', credentials))
     channel = connection.channel()
 
     for username, data in users_data.items():
