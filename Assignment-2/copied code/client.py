@@ -1,143 +1,65 @@
-import sys
 import grpc
-import raft_pb2 as pb2
-import raft_pb2_grpc as pb2_grpc
+import raft_pb2
+import raft_pb2_grpc
 
-SERVERS_INFO = {}
-SERVER_ADDRESS = -1
-SERVER_PORT = -1
+class RaftClient:
+    def __init__(self, server_addresses):
+        self.server_addresses = server_addresses
 
-
-def connect():
-    for id, address in SERVERS_INFO.items():
-        channel = grpc.insecure_channel(address)
-        stub = pb2_grpc.ServiceStub(channel)
-        message = pb2.EmptyMessage()
-        try:
-            _ = stub.GetStatus(message)
-            print(f'Connected to server {id}\n')
-            return stub
-        except:
-            pass
-    print("No servers are available\n")
-
-
-def get_leader():
-    stub = connect()
-    message = pb2.EmptyMessage()
-
-    try:
-        response = stub.GetLeader(message)
-        if response:
-            leader = response.leader
-            leader_address = response.address
-            print(f'ID: {leader}\t Address: {leader_address}')
-        else:
-            print(f'Nothing\n')
-    except grpc.RpcError:
-        print("Server is not avaliable\n")
-
-
-def suspend(period):
-    stub = connect()
-    message = pb2.PeriodMessage(period=period)
-
-    try:
-        _ = stub.Suspend(message)
-    except grpc.RpcError:
-        print("Server is not avaliable\n")
-
-
-def getVal(key):
-    stub = connect()
-    message = pb2.KeyMessage(key=key)
-
-    try:
-        response = stub.GetVal(message)
-        print(f'{key} = {response.value}')
-    except grpc.RpcError:
-        print("Server is not avaliable\n")
-
-
-def setVal(key, value):
-    stub = connect()
-    message = pb2.KeyValMessage(key=key, value=value)
-
-    try:
-        response = stub.SetVal(message)
-        if response.success:
-            pass
-        else:
-            print("Something went wrong, try again later\n")
-    except grpc.RpcError:
-        print("Server is not available\n")
-
-
-def check(intended_args, recieved_args):
-    if recieved_args < intended_args:
-        print("Not enouch arguments\n")
-        return True
-    elif recieved_args > intended_args:
-        print("Too many arguments\n")
-        return True
-    return False
-
-
-def quit():
-    print("Client Terminated\n")
-    sys.exit()
-
-
-def client():
-    print("Client Started\n")
-    while True:
-        try:
-            input_buffer = input("> ")
-            if len(input_buffer) <= 1:  # User entered an empty line
+    def find_leader(self):
+        for address in self.server_addresses:
+            try:
+                channel = grpc.insecure_channel(address)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                response = stub.GetLeader(raft_pb2.EmptyMessage())
+                if response.leader != -1:
+                    return response.address
+            except grpc.RpcError:
                 continue
+        return None
 
-            command = input_buffer.split()[0]  # command type
-            command_args = input_buffer.split()[1:]  # command arguments
+    def set_value(self, key, value):
+        leader_address = self.find_leader()
+        if leader_address:
+            try:
+                channel = grpc.insecure_channel(leader_address)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                response = stub.SetVal(raft_pb2.KeyValMessage(key=key, value=value))
+                return response.success
+            except grpc.RpcError:
+                print("Failed to set value. Trying to find a new leader.")
+                self.set_value(key, value)
+        else:
+            print("Leader not found. Cannot set value.")
+            return False
 
-            if command == "getleader":
-                if check(0, len(command_args)):
-                    continue
-                get_leader()
-            elif command == "suspend":
-                if check(1, len(command_args)):
-                    continue
-                suspend(int(command_args[0]))
-            elif command == "getval":
-                if check(1, len(command_args)):
-                    continue
-                getVal(command_args[0])
-            elif command == "setval":
-                if check(2, len(command_args)):
-                    continue
-                setVal(command_args[0], command_args[1])
-            elif command == "quit":
-                if check(0, len(command_args)):
-                    continue
-                quit()
-            else:
-                print(f'command: {command}, is not supported\n')
-        except KeyboardInterrupt:
-            return
+    def get_value(self, key):
+        leader_address = self.find_leader()
+        if leader_address:
+            try:
+                channel = grpc.insecure_channel(leader_address)
+                stub = raft_pb2_grpc.RaftStub(channel)
+                response = stub.GetVal(raft_pb2.KeyMessage(key=key))
+                if response.success:
+                    return response.value
+                else:
+                    return "Key not found."
+            except grpc.RpcError:
+                print("Failed to get value. Trying to find a new leader.")
+                return self.get_value(key)
+        else:
+            print("Leader not found. Cannot get value.")
+            return None
+        
 
-
-def configuration():
-    """
-    Setup configuration of servers based on Config.conf
-    """
-    with open('Config.conf') as f:
-        global SERVERS_INFO
-        lines = f.readlines()
-        for line in lines:
-            parts = line.split()
-            id, address, port = parts[0], parts[1], parts[2]
-            SERVERS_INFO[int(id)] = (f'{str(address)}:{str(port)}')
 
 
 if __name__ == "__main__":
-    configuration()
-    client()
+    client = RaftClient(['localhost:50051', 'localhost:50052', 'localhost:50053'])
+    # Test setting a value
+    success = client.set_value("testKey", "testValue")
+    print(f"Set operation success: {success}")
+
+    # Test getting a value
+    value = client.get_value("testKey")
+    print(f"Get operation returned: {value}")
