@@ -18,7 +18,7 @@ class RaftClient:
                 continue
         return None
 
-    def set_value(self, key, value):
+    def set_value(self, key, value, retry_count=3):
         leader_address = self.find_leader()
         if leader_address:
             try:
@@ -26,12 +26,16 @@ class RaftClient:
                 stub = raft_pb2_grpc.RaftStub(channel)
                 response = stub.SetVal(raft_pb2.KeyValMessage(key=key, value=value))
                 return response.success
-            except grpc.RpcError:
-                print("Failed to set value. Trying to find a new leader.")
-                self.set_value(key, value)
+            except grpc.RpcError as e:
+                if retry_count > 0:
+                    print(f"Failed to set value, retrying... Error: {e}")
+                    return self.set_value(key, value, retry_count - 1)
+                else:
+                    print("Failed to set value after retries.")
         else:
             print("Leader not found. Cannot set value.")
-            return False
+        return False
+
 
     def get_value(self, key):
         leader_address = self.find_leader()

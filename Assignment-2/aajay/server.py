@@ -61,11 +61,34 @@ class RaftServer(raft_pb2_grpc.RaftServicer):
     def AppendEntries(self, request, context):
         if request.term < self.term:
             return raft_pb2.AppendEntriesResponse(term=self.term, success=False)
-        
+
         self.reset_election_timer()
         self.leader_id = request.leaderId
-        # Assume successful append for simplicity, real implementation should check log consistency
+        self.state = 'Follower'
+
+        # Ensure log consistency
+        if len(self.logs) < request.prevLogIndex or \
+        (request.prevLogIndex > 0 and self.logs[request.prevLogIndex - 1].term != request.prevLogTerm):
+            return raft_pb2.AppendEntriesResponse(term=self.term, success=False)
+
+        # Append new entries
+        index_to_append = request.prevLogIndex
+        for entry in request.entries:
+            if index_to_append < len(self.logs) and self.logs[index_to_append].term != entry.term:
+                # Conflict found, truncate the log
+                self.logs = self.logs[:index_to_append]
+            if index_to_append >= len(self.logs):
+                # Append new entries not already in the log
+                self.logs.append(entry)
+            index_to_append += 1
+
+        # Update commit index
+        if request.leaderCommit > self.commit_index:
+            self.commit_index = min(request.leaderCommit, len(self.logs))
+            self.apply_log_entries()
+
         return raft_pb2.AppendEntriesResponse(term=self.term, success=True)
+
 
     def send_heartbeats(self):
         # Placeholder for sending heartbeats to all peers
@@ -82,6 +105,17 @@ class RaftServer(raft_pb2_grpc.RaftServicer):
     
     def election_timeout(self):
         return time.time() >= self.election_timeout
+
+    def apply_log_entries(self):
+        while self.last_applied < self.commit_index:
+            entry = self.logs[self.last_applied]
+            # Assuming the log entry has key and value for simplicity
+            self.apply_entry_to_state_machine(entry.key, entry.value)
+            self.last_applied += 1
+
+    def apply_entry_to_state_machine(self, key, value):
+        # Example state machine is a simple key-value store
+        self.state_machine[key] = value
 
     def start_election(self):
         self.state = 'Candidate'
@@ -166,6 +200,27 @@ class RaftServer(raft_pb2_grpc.RaftServicer):
             self.apply_log_entries()
 
         return raft_pb2.AppendEntriesResponse(term=self.term, success=True)
+
+        # In the RaftServer class
+    def SetVal(self, request, context):
+        if self.state != 'Leader':
+            # Redirect client to the current leader if known; otherwise, return an error
+            return raft_pb2.SuccessMessage(success=False)
+        # Append the request as a new log entry and replicate it
+        new_log_entry = raft_pb2.LogEntry(term=self.term, key=request.key, value=request.value)
+        self.logs.append(new_log_entry)
+        # Log replication to followers would happen here
+        # For simplicity, we'll consider the operation successful immediately
+        return raft_pb2.SuccessMessage(success=True)
+
+    def GetVal(self, request, context):
+        # Directly serve the request if the key exists in the state machine
+        value = self.state_machine.get(request.key, None)
+        if value is not None:
+            return raft_pb2.SuccessValMessage(success=True, value=value)
+        else:
+            return raft_pb2.SuccessValMessage(success=False, value="")
+
 
 def serve(server_id, server_addresses):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
