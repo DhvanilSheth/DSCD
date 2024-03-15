@@ -5,6 +5,7 @@ import grpc
 import raft_pb2
 import raft_pb2_grpc
 import threading 
+import sys
 # Constants for Raft timeouts
 ELECTION_TIMEOUT_MIN = 150 / 1000  # 150ms
 ELECTION_TIMEOUT_MAX = 300 / 1000  # 300ms
@@ -13,7 +14,7 @@ HEARTBEAT_INTERVAL = 50 / 1000  # 50ms
 class RaftServer(raft_pb2_grpc.RaftServicer):
     def __init__(self, server_id, server_addresses):
         self.id = server_id
-        self.peers = server_addresses
+        self.peers = {str(i): address for i, address in enumerate(server_addresses)}
         self.term = 0
         self.voted_for = None
         self.logs = []
@@ -224,10 +225,11 @@ class RaftServer(raft_pb2_grpc.RaftServicer):
 
 def serve(server_id, server_addresses):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    raft_servicer = RaftServer(server_id, server_addresses)
+    raft_servicer = RaftServer(server_id, server_addresses)  # Moved instance creation here
     raft_pb2_grpc.add_RaftServicer_to_server(raft_servicer, server)
 
-    server.add_insecure_port(server_addresses[server_id])
+    server_port = server_addresses[server_id]  # Assumes server_addresses contains gRPC server endpoints
+    server.add_insecure_port(server_port)
     server.start()
     try:
         while True:
@@ -239,8 +241,7 @@ def serve(server_id, server_addresses):
 
 
 if __name__ == '__main__':
-    # Example usage: python server.py 0 'localhost:50051,localhost:50052,localhost:50053'
-    import sys
     server_id = int(sys.argv[1])
     server_addresses = sys.argv[2].split(',')
-    serve(server_id, server_addresses)
+    serve(server_id, server_addresses)  # Corrected line
+
