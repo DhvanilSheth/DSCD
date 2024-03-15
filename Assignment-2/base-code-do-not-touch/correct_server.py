@@ -5,8 +5,8 @@ from concurrent import futures
 import random
 
 import grpc
-import raft_pb2 as pb2
-import raft_pb2_grpc as pb2_grpc
+import correct_raft_pb2 as pb2
+import correct_raft_pb2_grpc as pb2_grpc
 
 ID = int(sys.argv[1])
 SERVERS_INFO = {}
