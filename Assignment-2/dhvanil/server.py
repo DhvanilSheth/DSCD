@@ -1,180 +1,464 @@
-import grpc
-import random
-import threading
-import time
 import sys
+import os
+import time
+from threading import Thread, Timer, Lock
 from concurrent import futures
+
+import random
+import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
 
-# Assuming SERVERS_INFO is filled with server id, address mappings
-SERVERS_INFO = {
-    1 : "localhost:50051",
-    2 : "localhost:50052",
-    3 : "localhost:50053",
-    # 4 : "localhost:50054",
-    # 5 : "localhost:50055",
-}
-
 ID = int(sys.argv[1])
+SERVERS_INFO = {}
 LEASE_DURATION = 2.5
-HEARTBEAT_INTERVAL = 1.0
+HEARTBEAT_INTERVAL = 1
 
-class Server(pb2_grpc.RaftServiceServicer):
+class Server:
     def __init__(self):
-        self.state = "Follower"
-        self.term = 0
-        self.id = ID
-        self.voted_for = None
-        self.log = []
-        self.commitIndex = 0
-        self.lastApplied = 0
-        self.database = {}
-        self.votes_received = 0
-        self.election_timeout = None
-        self.heartbeat_timer = None
-        self.lock = threading.Lock()
 
-        self.reset_election_timeout()
+        self.vote_lock = Lock()
+        self.state = "Follower" # Initial state
+        self.term = 0 # Current term starts at 0
+        self.id = ID # Server ID
 
-    def reset_election_timeout(self):
-        with self.lock:
-            if self.election_timeout:
-                self.election_timeout.cancel()
-            timeout = random.uniform(5, 10)
-            self.election_timeout = threading.Timer(timeout, self.start_election)
-            self.election_timeout.start()
-            print(f"Server {self.id} reset election timeout to {timeout} seconds")
+        self.votedFor = None  # Tracks who the server voted for
+        self.leaderId = None # ID of the current leader, if known
+        self.timeout = None # Election timeout
+        self.sleep = False # Flag to indicate if the server is sleeping
+        self.timer = None # Timer for election timeout
+        self.threads = [] # List of threads for election
+        
+        self.database = {} # Key-value store
+        self.log = [] # Log of commands
+        self.leaseExpiration = 0 # Time when the lease expires
+        self.votesReceived = 0  # Votes received in the current election
+        self.nextIndex = {} # For each server, index of the next log entry to send to that server
+        self.matchIndex = {} # For each server, index of the highest log entry known to be replicated on server
+        self.commitIndex = 0 # Index of highest log entry known to be committed
+        self.lastApplied = 0 # Index of highest log entry applied to state machine
 
-    def start_election(self):
-        with self.lock:
-            self.state = "Candidate"
-            self.term += 1
-            self.voted_for = self.id
-            self.votes_received = 1  # Vote for self
-            self.reset_election_timeout()
+        self.start()
 
-            for server_id in SERVERS_INFO:
-                if server_id != self.id:
-                    self.send_request_vote(server_id)
+    def start(self):
+        """Initialize server state and start the election timeout timer."""
+        self.set_timeout()
+        self.timer = Timer(0, self.become_follower)
+        self.timer.start()
 
-            print(f"Server {self.id} started election for term {self.term}")
+    def set_timeout(self):
+        """Set a random timeout for election."""
+        if self.sleep:
+            return
+        self.timeout = random.uniform(5, 10)
 
-    def send_request_vote(self, server_id):
-        with self.lock:
-            channel = grpc.insecure_channel(SERVERS_INFO[server_id])
-            stub = pb2_grpc.RaftServiceStub(channel)
-            last_log_index = len(self.log) - 1
-            last_log_term = self.log[last_log_index][1] if self.log else 0
-            response = stub.RequestVote(pb2.RequestVoteMessage(
-                term=self.term,
-                candidateId=self.id,
-                lastLogIndex=last_log_index,
-                lastLogTerm=last_log_term,
-            ))
-            if response.voteGranted and response.term == self.term:
-                self.votes_received += 1
-                if self.votes_received > len(SERVERS_INFO) // 2:
-                    self.become_leader()
-            print(f"Server {self.id} received {self.votes_received} votes for term {self.term}")
+    def reset_timer(self, timeout, func):
+        """Reset the election timeout timer."""
+        self.timer.cancel()
+        self.timer = Timer(timeout, func)
+        self.timer.start()
 
+    def update_state(self, state):
+        """Update the server state."""
+        if self.sleep:
+            return
+        self.state = state
+        print(f"Server {self.id} is now a {self.state}")
+
+    def update_term(self, term):
+        """Update the server term."""
+        if self.sleep:
+            return
+        self.term = term
+        self.votedFor = None
+        print(f"Server {self.id} term is now {self.term}")
+
+    # For all 3 follower states (Follower, Candidate, Leader)
+    # For Follower 
+    def become_follower(self):
+        """Become a follower."""
+        self.update_state("Follower")
+        self.reset_timer(self.timeout, self.follower_activity)
+
+    def follower_activity(self):
+        """ If it doesn't receive any communication from the leader, start election."""
+        if self.sleep or self.state != "Follower":
+            return
+        
+        print(f"Server {self.id} timed out")
+        print(f"Term: {self.term}, has not heard from leader {self.leaderId}")
+        self.leaderId = None
+        self.become_candidate()
+
+    # For Candidate
+    def become_candidate(self):
+        """Become a candidate."""
+        if self.sleep:
+            return
+        
+        self.update_state("Candidate")
+        self.update_term(self.term + 1)
+        self.votedFor = self.id
+        self.votesReceived = 1
+
+        print(f"Server {self.id} is now a candidate for term {self.term}")
+        
+        self.reset_timer(self.timeout, self.candidate_activity)
+        self.candidate_election()
+
+    def candidate_election(self):
+        """Initiate a new candidate election by requesting votes from all other servers."""
+        self.votesReceived = 1  # Vote for self
+        self.threads = []
+        
+        for server_id, server_info in SERVERS_INFO.items():
+            if server_id != self.id:
+                thread = Thread(target=self.request_vote, args=(server_id, server_info))
+                self.threads.append(thread)
+                # thread.start()
+
+        for thread in self.threads:
+            # thread.join()
+            thread.start()
+
+        # # Check if won the election after all threads complete
+        # with self.vote_lock:
+        #     if self.votesReceived > len(SERVERS_INFO) // 2:
+        #         self.become_leader()
+        #     else:
+        #         self.set_timeout()
+        #         self.become_follower()
+
+    def candidate_activity(self):
+        """Action taken by the candidate after election timeout."""
+        if self.sleep or self.state != "Candidate":
+            return
+        
+        for thread in self.threads:
+            thread.join()
+
+        print(f"Server {self.id} received {self.votesReceived} votes for term {self.term}")
+
+        with self.vote_lock:
+            if self.votesReceived <= len(SERVERS_INFO) // 2:
+                self.set_timeout()
+                self.become_follower()
+            else:
+                self.timeout = 0.5
+                self.become_leader()
+
+    # For Leader
     def become_leader(self):
-        with self.lock:
-            self.state = "Leader"
-            self.heartbeat_timer = threading.Timer(HEARTBEAT_INTERVAL, self.send_heartbeats)
-            self.heartbeat_timer.start()
-            print(f"Server {self.id} became leader for term {self.term}")
+        """Become a leader."""
+        if self.sleep:
+            return
+        
+        self.update_state("Leader")
+        self.leaderId = self.id
 
-    def send_heartbeats(self):
-        with self.lock:
-            if self.state != "Leader":
-                return
-            for server_id in SERVERS_INFO:
-                if server_id != self.id:
-                    self.send_append_entries(server_id)
-            self.heartbeat_timer = threading.Timer(HEARTBEAT_INTERVAL, self.send_heartbeats)
-            self.heartbeat_timer.start()
-            print(f"Server {self.id} sent heartbeats for term {self.term}")
+        self.nextIndex = {server_id: (len(self.log)+1) for server_id in SERVERS_INFO}
+        self.matchIndex = {server_id: 0 for server_id in SERVERS_INFO}
 
-    def send_append_entries(self, server_id):
-        with self.lock:
-            channel = grpc.insecure_channel(SERVERS_INFO[server_id])
-            stub = pb2_grpc.RaftServiceStub(channel)
-            prev_log_index = len(self.log) - 1
-            prev_log_term = self.log[prev_log_index][1] if self.log else 0
-            entries = self.log[prev_log_index + 1:] if prev_log_index + 1 < len(self.log) else []
-            stub.AppendEntries(pb2.AppendEntriesMessage(
-                term=self.term,
-                leaderId=self.id,
-                prevLogIndex=prev_log_index,
-                prevLogTerm=prev_log_term,
-                entries=[pb2.LogEntry(term=e[1], command=e[2]) for e in entries],
-                leaderCommit=self.commitIndex,
-            ))
-            print(f"Server {self.id} sent append entries to {server_id} for term {self.term}")
+        self.leader_activity()
+
+    def leader_activity(self):
+        """Leader sends heartbeats to all followers to maintain its state and lease."""
+        if self.sleep or self.state != "Leader":
+            return
+        
+        print(f"Server {self.id} as leader sending heartbeats with lease.")
+        self.update_lease_expiration()  # Update leader's lease expiration based on the current time
+        
+        self.threads = []
+        for server_id, server_info in SERVERS_INFO.items():
+            if server_id == self.id:
+                continue
+            self.threads.append(Thread(target=self.heartbeat, args=(server_id, server_info)))
+
+        for thread in self.threads:
+            thread.start()
+        
+        self.reset_timer(HEARTBEAT_INTERVAL, self.leader_check)
+        
+        # # Check if lease is still valid and schedule the next heartbeat
+        # if time.time() < self.leaseExpiration:
+        #     self.reset_timer(HEARTBEAT_INTERVAL, self.leader_activity)
+        # else:
+        #     # Handle lease expiration (e.g., step down as leader)
+        #     print(f"Leader {self.id}'s lease expired. Stepping down.")
+        #     self.become_follower()
+
+    def leader_check(self):
+        """ Checks the database for commits and updates accordingly. """
+        if self.sleep or self.state != "Leader":
+            return
+        
+        for thread in self.threads:
+            thread.join()
+
+        self.nextIndex[self.id] = len(self.log) + 1
+        self.matchIndex[self.id] = len(self.log)
+
+        commits = sum(1 for server_id in SERVERS_INFO if self.matchIndex[server_id] > self.commitIndex)
+
+        if commits > len(self.matchIndex) // 2:
+            self.commitIndex += 1
+        while self.commitIndex > self.lastApplied:
+            key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
+            self.database[key] = value
+            print(f"Term : {self.term} and Key : {key} and Value : {value}")
+            self.lastApplied += 1
+
+        self.leader_activity()
+
+    def request_vote(self, server_id, server_info):
+        """Send a RequestVote RPC to a server."""
+        print(f"Server {self.id} is requesting vote from server {server_id}")
+    
+        if self.sleep or self.state != "Candidate":
+            return
+    
+        channel = grpc.insecure_channel(server_info)
+        stub = pb2_grpc.RaftServiceStub(channel)
+        message = pb2.RequestVoteMessage(
+            term=self.term,
+            candidateId=self.id,
+            lastLogIndex=len(self.log),
+            lastLogTerm=self.log[-1]["term"] if self.log else 0,
+            oldLeaderLeaseDuration = LEASE_DURATION
+        )
+
+        try:
+            response = stub.RequestVote(message)
+            reciever_term = response.term
+            vote_granted = response.voteGranted
+            old_lease = response.oldLeaderLeaseDuration
+            if reciever_term > self.term:
+                self.update_term(reciever_term)
+                self.set_timeout()
+                self.become_follower()
+            elif vote_granted:
+                with self.vote_lock:
+                    self.votesReceived += 1
+                    print(f"Server {self.id} received vote from server {server_id}")
+
+        except grpc.RpcError as e:
+            print(f"Failed to request vote from server {server_id} due to {e}")
+
+    def heartbeat(self, server_id, server_info):
+        """Send a heartbeat to a server."""
+        if self.sleep or self.state != "Leader":
+            return
+        
+        channel = grpc.insecure_channel(server_info)
+        stub = pb2_grpc.RaftServiceStub(channel)
+
+        entries = []
+        if self.nextIndex[server_id] <= len(self.log):
+            entries = [self.log[self.nextIndex[server_id]-1]]
+
+        prev_log_term = 0
+        if self.nextIndex[server_id] > 1:
+            prev_log_term = self.log[self.nextIndex[server_id]-2]["term"]
+
+        message = pb2.AppendEntriesMessage(
+            term=self.term,
+            leaderId=self.id,
+            prevLogIndex=self.nextIndex[server_id]-1,
+            prevLogTerm=prev_log_term,
+            entries=entries,
+            leaderCommit=self.commitIndex,
+            oldLeaderLeaseDuration = LEASE_DURATION
+        )
+
+        try:
+            response = stub.AppendEntries(message)
+            reciever_term = response.term
+            success = response.success
+            if reciever_term > self.term:
+                self.update_term(reciever_term)
+                self.set_timeout()
+                self.become_follower()
+            elif success and len(entries) != 0:
+                self.nextIndex[server_id] += 1
+                self.matchIndex[server_id] = self.nextIndex[server_id] - 1
+            elif not success:
+                self.nextIndex[server_id] -= 1
+                self.matchIndex[server_id] = min(self.nextIndex[server_id] - 1, self.matchIndex[server_id])
+
+        except grpc.RpcError as e:
+            print(f"Failed to send heartbeat to server {server_id} due to {e}")
+class Handler(pb2_grpc.RaftServiceServicer, Server):
+    def __init__(self):
+        super().__init__()
 
     def RequestVote(self, request, context):
-        with self.lock:
-            vote_granted = False
-            if request.term > self.term:
-                self.state = "Follower"
-                self.term = request.term
-                self.voted_for = None
-            if (self.voted_for is None or self.voted_for == request.candidateId) and \
-               (not self.log or (self.log[-1][1] <= request.lastLogTerm and len(self.log)-1 <= request.lastLogIndex)):
-                self.voted_for = request.candidateId
-                vote_granted = True
-                self.reset_election_timeout()
-            return pb2.VoteResponseMessage(term=self.term, voteGranted=vote_granted)
+        """Handle a RequestVote RPC."""
+        if self.sleep:
+            context.set_details("Server is sleeping")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.VoteResponseMessage()
+        
+        reply = {"term": -1, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+
+        if request.term == self.term:
+            if self.votedFor or request.lastLogIndex < len(self.log) or self.state != "Follower":
+                reply = {"term": self.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+            elif request.lastLogIndex == len(self.log) and self.log[request.lastLogIndex - 1]["term"] != request.lastLogTerm:
+                reply = {"term": self.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+            else:
+                self.votedFor = True
+                self.leaderId = request.id
+                print(f"Term : {self.term} and Voted for : {request.id}")
+                reply = {"term": self.term, "voteGranted": True, "oldLeaderLeaseDuration": LEASE_DURATION}
+
+            if self.state == "Follower":
+                self.reset_timer(self.timeout, self.follower_activity)
+
+        elif request.term > self.term:
+            self.update_term(request.term)
+            print(f"Term : {self.term} and Voted for : {request.id}")
+            self.leaderId = request.id
+            self.votedFor = True
+            self.become_follower()
+            reply = {"term": self.term, "voteGranted": True, "oldLeaderLeaseDuration": LEASE_DURATION}
+
+        else:
+            reply = {"term": self.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+            if self.state == "Follower":
+                self.reset_timer(self.timeout, self.follower_activity)
+
+        return pb2.VoteResponseMessage(term=reply["term"], voteGranted=reply["voteGranted"], oldLeaderLeaseDuration=reply["oldLeaderLeaseDuration"])
 
     def AppendEntries(self, request, context):
-        with self.lock:
-            success = False
-            if request.term >= self.term:
-                self.state = "Follower"
-                self.term = request.term
-                self.reset_election_timeout()
-                if request.prevLogIndex < len(self.log) and self.log[request.prevLogIndex][1] == request.prevLogTerm:
-                    self.log = self.log[:request.prevLogIndex + 1] + [(i, e.term, e.command) for i, e in enumerate(request.entries, start=request.prevLogIndex + 1)]
-                    success = True
-                    if request.leaderCommit > self.commitIndex:
-                        self.commitIndex = min(request.leaderCommit, len(self.log) - 1)
-                        self.apply_committed_entries()
-            return pb2.AppendEntriesResponseMessage(term=self.term, success=success)
+        """Handle an AppendEntries RPC."""
+        if self.sleep:
+            context.set_details("Server is sleeping")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.AppendEntriesResponseMessage()
         
-    def apply_committed_entries(self):
-        while self.commitIndex > self.lastApplied:
-            self.lastApplied += 1
-            _, _, command = self.log[self.lastApplied]
-            key, value = command.split()[1:]
-            self.database[key] = value
-            print(f"Server {self.id} applied {command} to state machine")
+        reply = {"term": -1, "success": False}
+
+        if request.term >= self.term:
+            if request.term > self.term:
+                self.update_term(request.term)
+                self.become_follower()
+                self.leaderId = request.leaderId
+            
+            if len(self.log) < request.prevLogIndex :
+                reply = {"term": self.term, "success": False}
+                if self.state == "Follower":
+                    self.reset_timer(self.timeout, self.follower_activity)
+
+            else:
+                if len(self.log) > request.prevLogIndex:
+                    self.log = self.log[:request.prevLogIndex]
+                
+                if len(request.entries) != 0:
+                    self.log.append({"term" : request.entries[0].term, "update" : {"command" : request.entries[0].update.command, "key" : request.entries[0].update.key, "value" : request.entries[0].update.value}})
+
+                if request.leaderCommit > self.commitIndex:
+                    self.commitIndex = min(request.leaderCommit, len(self.log))
+                    while self.commitIndex > self.lastApplied:
+                        key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
+                        self.database[key] = value
+                        print(f"Term : {self.term} and Key : {key} and Value : {value}")
+                        self.lastApplied += 1
+
+                reply = {"term": self.term, "success": True}
+                self.reset_timer(self.timeout, self.follower_activity)
+
+        else:
+            reply = {"term": self.term, "success": False}
+
+        return pb2.AppendEntriesResponseMessage(term=reply["term"], success=reply["success"])
+    
+    def GetLeader(self, request, context):
+        """ Method to handle a getLeader request """
+        if self.sleep:
+            context.set_details("Server is sleeping")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.LeaderMessage()
         
+
+        reply = {"leaderId": None , "leaderAddress": ""}
+        print(f"Term : {self.server.term} , Command : GetLeader")
+
+        if self.leaderId != None:
+            reply = {"leaderId": self.leaderId, "leaderAddress": SERVERS_INFO[self.leaderId]}
+
+        return pb2.LeaderMessage(leaderId=reply["leaderId"], leaderAddress=reply["leaderAddress"])
+    
     def SetVal(self, request, context):
-        with self.lock:
-            if self.state != "Leader":
-                # Forward request to leader if known
-                return pb2.OperationResponse(success=False, leaderId=str(self.leader_id))
-            self.log.append((len(self.log), self.term, f"SET {request.key} {request.value}"))
-            # Replicate to followers
-            self.send_heartbeats()
-            return pb2.OperationResponse(success=True, leaderId=str(self.id))
+        if self.sleep:
+            context.set_details("Server is sleeping")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.OperationResponseMessage()
         
+        reply = {"success": False}
+
+        if self.state == "Leader":
+            self.log.append({"term": self.term, "update": {"command": 'SET', "key": request.key, "value": request.value}})
+            # self.leader_check()
+            reply = {"success": True}
+
+        elif self.state == "Follower":
+            channel = grpc.insecure_channel(SERVERS_INFO[self.leaderId])
+            stub = pb2_grpc.RaftServiceStub(channel)
+            message = pb2.KeyValMessage(key = request.key, value = request.value)
+
+            try:
+                response = stub.SetVal(message)
+                reply = {"success": response.success}
+            except grpc.RpcError as e:
+                print(f"Server is not able to send the message to leader {self.leaderId} due to {e}")
+
+        return pb2.OperationResponseMessage(success=reply["success"])
+
     def GetVal(self, request, context):
-        with self.lock:
-            # Ensure this server is the leader or read from leader's state if lease is valid
-            if self.state != "Leader":
-                return pb2.ValResponse(value="", leaderId=str(self.leader_id))
-            return pb2.ValResponse(value=self.database.get(request.key, ""), leaderId=str(self.id))
+        if self.sleep:
+            context.set_details("Server is sleeping")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.ValResponseMessage()
         
-    def run(self):
-        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-        pb2_grpc.add_RaftServiceServicer_to_server(self, server)
-        # Add correct server address from SERVERS_INFO
-        server.add_insecure_port(SERVERS_INFO[self.id])
+        reply = {"success": False, "value": "None"}
+
+        if request.key in self.database:
+            reply = {"success": True, "value": self.database[request.key]}
+
+        return pb2.ValResponseMessage(success=reply["success"], value=reply["value"])
+    
+def serve():
+    """Start the server."""
+    print(f"Starting server {ID}")
+    print(f"Server Address: {SERVERS_INFO[ID]}")
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+    pb2_grpc.add_RaftServiceServicer_to_server(Handler(), server)
+    server.add_insecure_port(SERVERS_INFO[ID])
+    try:
         server.start()
-        server.wait_for_termination()
+        while True:
+            server.wait_for_termination()
+    except grpc.RpcError as e:
+        print(f"Server {ID} failed to start due to {e}")
+        server.stop(0)
+        os._exit(0)
+    except KeyboardInterrupt:
+        print(f"Server {ID} terminated by user")
+        server.stop(0)
+        os._exit(0)
+
+def config():
+    """Read the configuration file and store the server information."""
+    with open("Config.txt", "r") as file:
+        global SERVERS_INFO
+        for line in file:
+            server_info = line.split()
+            SERVERS_INFO[int(server_info[0])] = server_info[1] + ":" + server_info[2]
+
+def main():
+    config()
+    serve()
 
 if __name__ == "__main__":
-    server = Server()
-    server.run()
+    main()
