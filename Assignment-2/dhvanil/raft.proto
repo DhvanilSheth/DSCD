@@ -31,14 +31,14 @@ message RequestVoteMessage {
   int32 lastLogIndex = 3;
   int32 lastLogTerm = 4;
   // Adding the longest remaining lease duration of an old leader known to the voter.
-  int32 oldLeaderLeaseDuration = 5;
+  float oldLeaderLeaseDuration = 5;
 }
 
 message VoteResponseMessage {
   int32 term = 1;
   bool voteGranted = 2;
   // Propagating the longest old leader's lease duration to the candidate.
-  int32 oldLeaderLeaseDuration = 3;
+  float oldLeaderLeaseDuration = 3;
 }
 
 message AppendEntriesMessage {
@@ -49,7 +49,7 @@ message AppendEntriesMessage {
   repeated LogEntry entries = 5;
   int32 leaderCommit = 6;
   // Adding the lease interval duration.
-  int32 leaseDuration = 7;
+  float leaseDuration = 7;
 }
 
 message AppendEntriesResponseMessage {
@@ -97,3 +97,6 @@ message LeaderMessage {
 message TimePeriodMessage {
   int32 duration = 1;
 }
+
+
+//  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. raft.proto 
