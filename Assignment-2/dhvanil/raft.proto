@@ -49,7 +49,7 @@ message AppendEntriesMessage {
   repeated LogEntry entries = 5;
   int32 leaderCommit = 6;
   // Adding the lease interval duration.
-  float leaseDuration = 7;
+  float oldLeaderLeaseDuration = 7;
 }
 
 message AppendEntriesResponseMessage {

@@ -167,7 +167,7 @@ class Server:
             return
         
         print(f"Server {self.id} as leader sending heartbeats with lease.")
-        self.update_lease_expiration()  # Update leader's lease expiration based on the current time
+        self.update_lease(LEASE_DURATION)  # Update leader's lease expiration based on the current time
         
         self.threads = []
         for server_id, server_info in SERVERS_INFO.items():
@@ -210,6 +210,14 @@ class Server:
             self.lastApplied += 1
 
         self.leader_activity()
+
+        # Check if lease is still valid and schedule the next heartbeat
+        if self.get_lease_duration() > 0:
+            self.reset_timer(HEARTBEAT_INTERVAL, self.leader_activity)
+        else:
+            # Handle lease expiration (e.g., step down as leader)
+            print(f"Leader {self.id}'s lease expired. Stepping down.")
+            self.become_follower()
 
     def request_vote(self, server_id, server_info):
         """Send a RequestVote RPC to a server."""
@@ -268,7 +276,7 @@ class Server:
             prevLogTerm=prev_log_term,
             entries=entries,
             leaderCommit=self.commitIndex,
-            oldLeaderLeaseDuration=LEASE_DURATION
+            oldLeaderLeaseDuration=self.get_lease_duration()
         )
 
         try:
@@ -288,10 +296,19 @@ class Server:
 
         except grpc.RpcError as e:
             print(f"Failed to send heartbeat to server {server_id} due to {e}")
+
+    def get_lease_duration(self):
+        """Calculates the remaining lease duration."""
+        return max(0, self.leaseExpiration - time.time())
+
+    def update_lease(self, oldLeaderLeaseDuration):
+        """Updates the lease expiration time."""
+        self.leaseExpiration = time.time() + oldLeaderLeaseDuration
+
 class Handler(pb2_grpc.RaftServiceServicer):
     def __init__(self, server):
         self.server = server
-
+        
     def RequestVote(self, request, context):
         """Handle a RequestVote RPC."""
         if self.server.sleep:
@@ -299,32 +316,32 @@ class Handler(pb2_grpc.RaftServiceServicer):
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.VoteResponseMessage()
         
-        reply = {"term": -1, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+        reply = {"term": -1, "voteGranted": False, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
 
         if request.term == self.server.term:
             if self.server.votedFor or request.lastLogIndex < len(self.server.log) or self.server.state != "Follower":
-                reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+                reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
             elif request.lastLogIndex == len(self.server.log) and self.server.log[request.lastLogIndex - 1]["term"] != request.lastLogTerm:
-                reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+                reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
             else:
                 self.server.votedFor = True
-                self.server.leaderId = request.candidateId  # Corrected line
-                print(f"Term : {self.server.term} and Voted for : {request.candidateId}")  # Corrected line
-                reply = {"term": self.server.term, "voteGranted": True, "oldLeaderLeaseDuration": LEASE_DURATION}
+                self.server.leaderId = request.candidateId
+                print(f"Term : {self.server.term} and Voted for : {request.candidateId}")
+                reply = {"term": self.server.term, "voteGranted": True, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
 
             if self.server.state == "Follower":
                 self.server.reset_timer(self.server.timeout, self.server.follower_activity)
 
         elif request.term > self.server.term:
             self.server.update_term(request.term)
-            print(f"Term : {self.server.term} and Voted for : {request.candidateId}")  # Corrected line
-            self.server.leaderId = request.candidateId  # Corrected line
+            print(f"Term : {self.server.term} and Voted for : {request.candidateId}")
+            self.server.leaderId = request.candidateId
             self.server.votedFor = True
             self.server.become_follower()
-            reply = {"term": self.server.term, "voteGranted": True, "oldLeaderLeaseDuration": LEASE_DURATION}
+            reply = {"term": self.server.term, "voteGranted": True, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
 
         else:
-            reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": LEASE_DURATION}
+            reply = {"term": self.server.term, "voteGranted": False, "oldLeaderLeaseDuration": self.server.get_lease_duration()}
             if self.server.state == "Follower":
                 self.reset_timer(self.server.timeout, self.server.follower_activity)
 
