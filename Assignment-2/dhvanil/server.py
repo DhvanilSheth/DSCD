@@ -15,8 +15,7 @@ LEASE_DURATION = 2.5
 HEARTBEAT_INTERVAL = 1
 
 class Server:
-    def __init__(self):
-
+    def __init__(self, log_number):
         self.vote_lock = Lock()
         self.state = "Follower" # Initial state
         self.term = 0 # Current term starts at 0
@@ -37,6 +36,7 @@ class Server:
         self.matchIndex = {} # For each server, index of the highest log entry known to be replicated on server
         self.commitIndex = 0 # Index of highest log entry known to be committed
         self.lastApplied = 0 # Index of highest log entry applied to state machine
+        self.log_file = open(f"log_{log_number}.txt", "a+") # Log file to store information about the server
 
         self.start()
 
@@ -72,6 +72,8 @@ class Server:
         self.term = term
         self.votedFor = None
         print(f"Server {self.id} term is now {self.term}")
+        self.log_file.write(f"Term: {self.term}, VotedFor: {self.votedFor}\n")  # Add this line
+        self.log_file.flush()  # Add this line
 
     # For all 3 follower states (Follower, Candidate, Leader)
     # For Follower 
@@ -115,19 +117,19 @@ class Server:
             if server_id != self.id:
                 thread = Thread(target=self.request_vote, args=(server_id, server_info))
                 self.threads.append(thread)
-                # thread.start()
+                thread.start()
 
         for thread in self.threads:
-            # thread.join()
-            thread.start()
+            thread.join()
 
-        # # Check if won the election after all threads complete
-        # with self.vote_lock:
-        #     if self.votesReceived > len(SERVERS_INFO) // 2:
-        #         self.become_leader()
-        #     else:
-        #         self.set_timeout()
-        #         self.become_follower()
+        # Move majority check here to ensure it's done immediately after votes are collected
+        with self.vote_lock:
+            if self.votesReceived > len(SERVERS_INFO) // 2 and self.state == "Candidate":
+                self.become_leader()
+            else:
+                self.set_timeout()
+                self.become_follower()
+
 
     def candidate_activity(self):
         """Action taken by the candidate after election timeout."""
@@ -180,14 +182,6 @@ class Server:
         
         self.reset_timer(HEARTBEAT_INTERVAL, self.leader_check)
         
-        # # Check if lease is still valid and schedule the next heartbeat
-        # if time.time() < self.leaseExpiration:
-        #     self.reset_timer(HEARTBEAT_INTERVAL, self.leader_activity)
-        # else:
-        #     # Handle lease expiration (e.g., step down as leader)
-        #     print(f"Leader {self.id}'s lease expired. Stepping down.")
-        #     self.become_follower()
-
     def leader_check(self):
         """ Checks the database for commits and updates accordingly. """
         if self.sleep or self.state != "Leader":
@@ -199,7 +193,7 @@ class Server:
         self.nextIndex[self.id] = len(self.log) + 1
         self.matchIndex[self.id] = len(self.log)
 
-        commits = sum(1 for server_id in SERVERS_INFO if self.matchIndex[server_id] > self.commitIndex)
+        commits = sum(1 for server_id in SERVERS_INFO if self.matchIndex[server_id] > self.commitIndex and self.log[self.matchIndex[server_id] - 1]["term"] == self.term)
 
         if commits > len(self.matchIndex) // 2:
             self.commitIndex += 1
@@ -249,9 +243,13 @@ class Server:
                 with self.vote_lock:
                     self.votesReceived += 1
                     print(f"Server {self.id} received vote from server {server_id}")
+                    self.log_file.write(f"Server {self.id} received vote from server {server_id}\n")
+                    self.log_file.flush()
 
         except grpc.RpcError as e:
             print(f"Failed to request vote from server {server_id} due to {e}")
+            time.sleep(5)
+            self.request_vote(server_id, server_info)
 
     def heartbeat(self, server_id, server_info):
         """Send a heartbeat to a server."""
@@ -287,9 +285,13 @@ class Server:
                 self.update_term(reciever_term)
                 self.set_timeout()
                 self.become_follower()
+            
             elif success and len(entries) != 0:
                 self.nextIndex[server_id] += 1
                 self.matchIndex[server_id] = self.nextIndex[server_id] - 1
+                self.log_file.write(f"Server {self.id} sent heartbeat to server {server_id}\n")
+                self.log_file.flush()
+
             elif not success:
                 self.nextIndex[server_id] -= 1
                 self.matchIndex[server_id] = min(self.nextIndex[server_id] - 1, self.matchIndex[server_id])
@@ -368,22 +370,22 @@ class Handler(pb2_grpc.RaftServiceServicer):
                     self.server.reset_timer(self.server.timeout, self.server.follower_activity)
 
             else:
-                if len(self.server.log) > request.prevLogIndex:
-                    self.server.log = self.server.log[:request.prevLogIndex]
-                
-                if len(request.entries) != 0:
-                    self.server.log.append({"term" : request.entries[0].term, "update" : {"command" : request.entries[0].update.command, "key" : request.entries[0].update.key, "value" : request.entries[0].update.value}})
+                if len(self.server.log) > request.prevLogIndex and self.server.log[request.prevLogIndex - 1]["term"] != request.prevLogTerm:
+                    reply = {"term": self.server.term, "success": False}
+                else:
+                    if len(request.entries) != 0:
+                        self.server.log.append({"term" : request.entries[0].term, "update" : {"command" : request.entries[0].update.command, "key" : request.entries[0].update.key, "value" : request.entries[0].update.value}})
 
-                if request.leaderCommit > self.server.commitIndex:
-                    self.server.commitIndex = min(request.leaderCommit, len(self.server.log))
-                    while self.server.commitIndex > self.server.lastApplied:
-                        key, value = self.server.log[self.server.lastApplied]["update"]["key"], self.server.log[self.server.lastApplied]["update"]["value"]
-                        self.server.database[key] = value
-                        print(f"Term : {self.server.term} and Key : {key} and Value : {value}")
-                        self.server.lastApplied += 1
+                    if request.leaderCommit > self.server.commitIndex:
+                        self.server.commitIndex = min(request.leaderCommit, len(self.server.log))
+                        while self.server.commitIndex > self.server.lastApplied:
+                            key, value = self.server.log[self.server.lastApplied]["update"]["key"], self.server.log[self.server.lastApplied]["update"]["value"]
+                            self.server.database[key] = value
+                            print(f"Term : {self.server.term} and Key : {key} and Value : {value}")
+                            self.server.lastApplied += 1
 
-                reply = {"term": self.server.term, "success": True}
-                self.server.reset_timer(self.server.timeout, self.server.follower_activity)
+                    reply = {"term": self.server.term, "success": True}
+                    self.server.reset_timer(self.server.timeout, self.server.follower_activity)
 
         else:
             reply = {"term": self.server.term, "success": False}
@@ -448,7 +450,7 @@ class Handler(pb2_grpc.RaftServiceServicer):
 def serve():
     """Start the server."""
     print(f"Starting server {ID}")
-    server_instance = Server()  # Create a Server instance
+    server_instance = Server(ID)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     handler_instance = Handler(server_instance)  # Pass the Server instance to Handler
     pb2_grpc.add_RaftServiceServicer_to_server(handler_instance, server)
