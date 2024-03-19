@@ -1,7 +1,7 @@
 import sys
 import os
 import time
-from threading import Thread, Timer, Lock
+from threading import Thread, Timer, Lock, Condition
 from concurrent import futures
 
 import random
@@ -36,7 +36,9 @@ class Server:
         self.matchIndex = {} # For each server, index of the highest log entry known to be replicated on server
         self.commitIndex = 0 # Index of highest log entry known to be committed
         self.lastApplied = 0 # Index of highest log entry applied to state machine
+        
         self.log_file = open(f"log_{log_number}.txt", "a+") # Log file to store information about the server
+        self.commitCondition = Condition()  # Condition variable for log commits
 
         self.start()
 
@@ -197,6 +199,8 @@ class Server:
 
         if commits > len(self.matchIndex) // 2:
             self.commitIndex += 1
+            with self.commitCondition:
+                self.commitCondition.notify_all()  # Notify all waiting threads when a log entry is committed
         while self.commitIndex > self.lastApplied:
             key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
             self.database[key] = value
@@ -261,7 +265,14 @@ class Server:
 
         entries = []
         if self.nextIndex[server_id] <= len(self.log):
-            entries = [self.log[self.nextIndex[server_id]-1]]
+            log_entry = self.log[self.nextIndex[server_id]-1]
+            if "key" in log_entry:
+                entries = [pb2.LogEntry(
+                    term=log_entry["term"],
+                    key=log_entry["key"],
+                    value=log_entry["value"],
+                    command=log_entry["command"]
+                )]
 
         prev_log_term = 0
         if self.nextIndex[server_id] > 1:
@@ -415,11 +426,20 @@ class Handler(pb2_grpc.RaftServiceServicer):
             return pb2.OperationResponseMessage()
         
         reply = {"success": False}
+        print(f"Recieved SetVal request for key {request.key} and value {request.value}")
 
         if self.server.state == "Leader":
+            log_index = len(self.server.log)
             self.server.log.append({"term": self.server.term, "update": {"command": 'SET', "key": request.key, "value": request.value}})
-            # self.leader_check()
+            print(self.server.log)
+            
+            # # Wait until the log entry has been committed
+            # while self.server.commitCondition:
+            #     while self.server.commitIndex < log_index:
+            #         self.server.commitCondition.wait()
+            
             reply = {"success": True}
+            print(f"Succesfully set value for key {request.key} and value {request.value}")
 
         elif self.server.state == "Follower":
             channel = grpc.insecure_channel(SERVERS_INFO[self.server.leaderId])
@@ -434,6 +454,18 @@ class Handler(pb2_grpc.RaftServiceServicer):
 
         return pb2.OperationResponseMessage(success=reply["success"])
 
+    # def GetVal(self, request, context):
+    #     if self.server.sleep:
+    #         context.set_details("Server is sleeping")
+    #         context.set_code(grpc.StatusCode.UNAVAILABLE)
+    #         return pb2.ValResponseMessage()
+        
+    #     reply = {"success": False, "value": "None"}
+
+    #     if request.key in self.server.log["update"]["key"]:
+    #         reply = {"success": True, "value": self.server.log[request.key]}
+
+    #     return pb2.ValResponseMessage(success=reply["success"], value=reply["value"])
     def GetVal(self, request, context):
         if self.server.sleep:
             context.set_details("Server is sleeping")
@@ -442,10 +474,14 @@ class Handler(pb2_grpc.RaftServiceServicer):
         
         reply = {"success": False, "value": "None"}
 
-        if request.key in self.server.database:
-            reply = {"success": True, "value": self.server.database[request.key]}
+        # Iterate over the log
+        for entry in self.server.log:
+            # Check if the log entry's 'update' dictionary contains the key
+            if entry["update"]["command"] == 'SET' and entry["update"]["key"] == request.key:
+                reply = {"success": True, "value": entry["update"]["value"]}
+                break
 
-        return pb2.ValResponseMessage(success=reply["success"], value=reply["value"])
+        return pb2.ValResponseMessage(success=reply["success"], value=reply["value"])   
     
 def serve():
     """Start the server."""

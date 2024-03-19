@@ -11,3 +11,24 @@ Term: 8, VotedFor: None
 Term: 9, VotedFor: None
 Term: 10, VotedFor: None
 Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 2, VotedFor: None
+Term: 1, VotedFor: None
+Term: 2, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 2, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Term: 1, VotedFor: None
+Server 3 received vote from server 0
+Server 3 received vote from server 1
+Server 3 received vote from server 2
+Server 3 received vote from server 4
+Term: 1, VotedFor: None
