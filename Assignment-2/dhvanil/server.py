@@ -551,8 +551,8 @@ class Handler(pb2_grpc.RaftServiceServicer):
         
         reply = {"success": False, "value": "None"}
 
-        # Iterate over the log
-        for entry in self.server.log:
+        # Iterate over the log from the back to find the most recent value for the key
+        for entry in reversed(self.server.log):
             # Check if the log entry's 'update' dictionary contains the key
             if entry["update"]["command"] == 'SET' and entry["update"]["key"] == request.key:
                 reply = {"success": True, "value": entry["update"]["value"]}
