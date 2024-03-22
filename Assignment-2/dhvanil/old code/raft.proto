@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package raft;
+
+// The Raft service definition.
+service RaftService {
+  // Sends a request vote message to other nodes.
+  rpc RequestVote(RequestVoteMessage) returns (VoteResponseMessage);
+  
+  // Appends entries to the log, used for log replication and heartbeats.
+  // Modified to include lease interval duration.
+  rpc AppendEntries(AppendEntriesMessage) returns (AppendEntriesResponseMessage);
+  
+  // Client-facing RPCs for setting and getting key-value pairs.
+  rpc SetVal(KeyValMessage) returns (OperationResponseMessage);
+  rpc GetVal(KeyMessage) returns (ValResponseMessage);
+  
+  // Additional RPCs for management and testing.
+  rpc GetLeader(EmptyMessage) returns (LeaderMessage);
+
+  // Suspend the node for a given time period in case of network partitioning. 
+  rpc Suspend(TimePeriodMessage) returns (EmptyMessage);
+  rpc GetStatus(EmptyMessage) returns (EmptyMessage);
+}
+
+// Messages used by the RaftService.
+
+message RequestVoteMessage {
+  int32 term = 1;
+  int32 candidateId = 2;
+  int32 lastLogIndex = 3;
+  int32 lastLogTerm = 4;
+  // Adding the longest remaining lease duration of an old leader known to the voter.
+  float oldLeaderLeaseDuration = 5;
+}
+
+message VoteResponseMessage {
+  int32 term = 1;
+  bool voteGranted = 2;
+  // Propagating the longest old leader's lease duration to the candidate.
+  float oldLeaderLeaseDuration = 3;
+}
+
+message AppendEntriesMessage {
+  int32 term = 1;
+  int32 leaderId = 2;
+  int32 prevLogIndex = 3;
+  int32 prevLogTerm = 4;
+  repeated LogEntry entries = 5;
+  int32 leaderCommit = 6;
+  // Adding the lease interval duration.
+  float oldLeaderLeaseDuration = 7;
+}
+
+message AppendEntriesResponseMessage {
+  int32 term = 1;
+  bool success = 2;
+}
+
+message LogEntry {
+  int32 term = 1;
+  string key = 2;
+  string value = 3;
+  // Including command to differentiate between operation types, e.g., SET, GET, NO-OP.
+  string command = 4;
+}
+
+// Client-facing messages for setting and getting values.
+message KeyValMessage {
+  string key = 1;
+  string value = 2;
+}
+
+message KeyMessage {
+  string key = 1;
+}
+
+message OperationResponseMessage {
+  bool success = 1;
+}
+
+message ValResponseMessage {
+  bool success = 1;
+  string value = 2;
+}
+
+// Utility and management messages.
+message EmptyMessage {}
+
+message LeaderMessage {
+  int32 leaderId = 1;
+  string leaderAddress = 2;
+}
+
+// Message to suspend the node for a given time period.
+
+message TimePeriodMessage {
+  int32 duration = 1;
+}
+
+
+//  python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. raft.proto 

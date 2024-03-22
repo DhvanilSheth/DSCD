@@ -1,93 +1,49 @@
 import grpc
-import raft_pb2 as pb2
-import raft_pb2_grpc as pb2_grpc
+import raft_pb2
+import raft_pb2_grpc
 
-# Assuming SERVERS_INFO is loaded from a configuration similar to the server setup
-SERVERS_INFO = {0: "localhost:50051", 1: "localhost:50052", 2: "localhost:50053", 3: "localhost:50054", 4: "localhost:50055"}
-leader_info = {"stub": None, "id": None}
- 
-def connect():
-    """Attempt to connect to the Raft cluster and return the stub of the leader."""
-    # if leader_info["stub"] and leader_info["id"]:
-    #     return leader_info["stub"], leader_info["id"]
-
-    for id, address in SERVERS_INFO.items():
-        try:
-            channel = grpc.insecure_channel(address)
-            stub = pb2_grpc.RaftServiceStub(channel)
-            response = stub.GetLeader(pb2.EmptyMessage())
-            leader_address = response.leaderAddress
-            leader_id = response.leaderId
-            if leader_address == "empty":
-                print(f"Server {id} is not the leader.")
-            else:
-                print(f"Found leader {leader_id} at {leader_address}")
-                leader_channel = grpc.insecure_channel(leader_address)
-                leader_stub = pb2_grpc.RaftServiceStub(leader_channel)
-                leader_info["stub"] = leader_stub
-                leader_info["id"] = leader_id
-                return leader_stub, leader_id
-                
-        except grpc.RpcError:
-            print(f"Failed to connect to server {id} at {address}")
-    
-    print("Unable to find the leader or connect to the cluster.")
-    return None, None
-
-def get_leader():
-    """Get the current leader of the Raft cluster."""
-    leader_info["stub"], leader_info["id"] = None, None  # Reset the leader info
-    _, leader_id = connect()
-    if leader_id is not None:
-        print(f'Current leader ID: {leader_id}')
-
-def getVal(key):
-    """Get the value for a given key from the Raft cluster."""
-    stub, _ = connect()
-    if stub:
-        try:
-            response = stub.GetVal(pb2.KeyMessage(key=key))
-            if response.success:
-                print(f'Value for {key}: {response.value}')
-            else:
-                print(f"Key '{key}' not found.")
-        except grpc.RpcError as e:
-            print(f"Error getting value for key '{key}': {e}")
-
-def setVal(key, value):
-    """Set the value for a given key in the Raft cluster."""
-    stub, _ = connect()
-    if stub:
-        try:
-            response = stub.SetVal(pb2.KeyValMessage(key=key, value=value))
-            if response.success:
-                print(f"Set value for key '{key}' to '{value}'.")
-            else:
-                print(f"Failed to set value for key '{key}'.")
-        except grpc.RpcError as e:
-            print(f"Error setting value for key '{key}': {e}")
-
-def client():
-    """Interactive client for communicating with the Raft cluster."""
-    print("Raft Client Started. Type 'quit' to exit.")
+def run_client(node_address_mapping):
+    leader_node_id = None
     while True:
-        cmd = input("> ").strip().lower()
-        if cmd == "quit":
-            print("Client terminated.")
-            break
-        elif cmd.startswith("get "):
-            _, key = cmd.split(maxsplit=1)
-            getVal(key)
-        elif cmd.startswith("set "):
-            _, rest = cmd.split(maxsplit=1)
-            key, value = rest.split(maxsplit=1)
-            setVal(key, value)
-        # elif cmd.startswith("no-op"):
-            # NO-OP
-        elif cmd == "leader":
-            get_leader()
+        if leader_node_id is None:
+            for node_id, node_address in node_address_mapping.items():
+                with grpc.insecure_channel(node_address) as channel:
+                    raft_stub = raft_pb2_grpc.RaftStub(channel)
+                    try:
+                        response = raft_stub.ServeClient(raft_pb2.ServeClientArgs(Request="GET __leader__"))
+                        if response.Success:
+                            leader_node_id = response.LeaderID
+                            print(f"Connected to leader: {leader_node_id}")
+                            break
+                    except grpc.RpcError as e:
+                        continue
         else:
-            print("Unknown command. Use 'GET', 'SET', or 'LEADER'.")
+            with grpc.insecure_channel(node_address_mapping[int(leader_node_id)]) as channel:
+                raft_stub = raft_pb2_grpc.RaftStub(channel)
+                while True:
+                    client_request = input("Enter command (GET <key> or SET <key> <value>): ")
+                    try:
+                        response = raft_stub.ServeClient(raft_pb2.ServeClientArgs(Request=client_request))
+                        if response.Success:
+                            print(f"Response: {response.Data}")
+                        else:
+                            print(f"Leader changed. Connecting to new leader.")
+                            leader_node_id = None if response.LeaderID == 'None' else response.LeaderID
+                            if leader_node_id is not None:
+                                print("New leader ID is:", leader_node_id)
+                            break
+                    except grpc.RpcError as e:
+                        print(f"Error occurred: {e}")
+                        leader_node_id = None
+                        break
 
 if __name__ == "__main__":
-    client()
+    node_address_mapping = {
+        0: "localhost:50050",
+        1: "localhost:50051",
+        2: "localhost:50052",
+        3: "localhost:50053",
+        4: "localhost:50054",
+        5: "localhost:50055",
+    }
+    run_client(node_address_mapping)
