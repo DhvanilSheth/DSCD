@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import argparse
 from threading import Thread, Timer, Lock, Condition
 from concurrent import futures
 
@@ -459,55 +460,6 @@ class Handler(pb2_grpc.RaftServiceServicer):
         
         else:
             return pb2.LeaderMessage(leaderId=reply["leaderId"], leaderAddress=reply["leaderAddress"])
-        
-    # def SetVal(self, request, context):
-    #     if self.server.sleep:
-    #         context.set_details("Server is sleeping")
-    #         context.set_code(grpc.StatusCode.UNAVAILABLE)
-    #         return pb2.OperationResponseMessage()
-        
-    #     reply = {"success": False}
-    #     print(f"Recieved SetVal request for key {request.key} and value {request.value}")
-
-    #     if self.server.state == "Leader":
-    #         log_index = len(self.server.log)
-    #         self.server.log.append({"term": self.server.term, "update": {"command": 'SET', "key": request.key, "value": request.value}})
-    #         print(self.server.log)
-            
-    #         # # Wait until the log entry has been committed
-    #         # while self.server.commitCondition:
-    #         #     while self.server.commitIndex < log_index:
-    #         #         self.server.commitCondition.wait()
-            
-    #         reply = {"success": True}
-    #         print(f"Succesfully set value for key {request.key} and value {request.value}")
-    #     # if self.server.state == "Leader":
-    #     #     log_entry = {"term": self.server.term, "command": "SET", "key": request.key, "value": request.value}
-    #     #     self.server.log.append(log_entry)
-            
-    #     #     log_index = len(self.server.log)
-    #     #     self.server.log_file.write(f"{log_entry['term']},{log_entry['command']},{log_entry['key']},{log_entry['value']}\n")
-    #     #     self.server.log_file.flush()
-            
-    #     #     # Wait for the entry to be committed
-    #     #     with self.server.commitCondition:
-    #     #         while self.server.lastApplied < log_index:
-    #     #             self.server.commitCondition.wait()
-            
-    #     #     reply = {"success": True}
-
-    #     elif self.server.state == "Follower":
-    #         channel = grpc.insecure_channel(SERVERS_INFO[self.server.leaderId])
-    #         stub = pb2_grpc.RaftServiceStub(channel)
-    #         message = pb2.KeyValMessage(key = request.key, value = request.value)
-
-    #         try:
-    #             response = stub.SetVal(message)
-    #             reply = {"success": response.success}
-    #         except grpc.RpcError as e:
-    #             print(f"Server is not able to send the message to leader {self.server.leaderId} due to {e}")
-
-    #     return pb2.OperationResponseMessage(success=reply["success"])
 
     def SetVal(self, request, context):
         if self.server.sleep:
@@ -580,7 +532,23 @@ def config():
             server_info = line.split()
             SERVERS_INFO[int(server_info[0])] = server_info[1] + ":" + server_info[2]
 
+def clean_logs(node_id):
+    """Clean logs, metadata, and dump text files for a node."""
+    log_dir = f"logs_node_{node_id}"
+    if os.path.exists(log_dir):
+        # Do not remove directory only clear the content in the files
+        for file in os.listdir(log_dir):
+            open(f"{log_dir}/{file}", "w").close()
+
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("node_id", type=int, help="Node ID")
+    parser.add_argument("clean", type=str, help="Clean logs, metadata, and dump text files")
+    args = parser.parse_args()
+
+    if args.clean.lower() == "true":
+        clean_logs(args.node_id)
+
     config()
     serve()
 

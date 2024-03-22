@@ -1,8 +1,1 @@
 Term: 1, VotedFor: None
-Term: 1, VotedFor: None
-Server 0 received vote from server 1
-Server 0 received vote from server 2
-Server 0 received vote from server 3
-Server 0 received vote from server 4
-1,SET,x,0
-1,SET,x,4
