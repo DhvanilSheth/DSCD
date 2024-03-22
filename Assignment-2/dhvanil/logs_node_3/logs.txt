@@ -1,0 +1,6 @@
+Term: 1, VotedFor: None
+Server 3 received vote from server 0
+Server 3 received vote from server 4
+Server 3 received vote from server 1
+Server 3 received vote from server 2
+Term: 1, VotedFor: None

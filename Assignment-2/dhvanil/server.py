@@ -524,7 +524,7 @@ class Handler(pb2_grpc.RaftServiceServicer):
             print(self.server.log)
             
             log_index = len(self.server.log)
-            self.server.log_file.write(f"{log_entry['term']},{log_entry['command']},{log_entry['key']},{log_entry['value']}\n")
+            self.server.log_file.write(f"{log_entry['term']},{log_entry['update']['command']},{log_entry['update']['key']},{log_entry['update']['value']}\n")
             self.server.log_file.flush()
             
             reply = {"success": True}
@@ -540,7 +540,7 @@ class Handler(pb2_grpc.RaftServiceServicer):
             except grpc.RpcError as e:
                 print(f"Server is not able to send the message to leader {self.server.leaderId} due to {e}")
 
-        print(reply)
+        # print(reply)
         return pb2.OperationResponseMessage(success=reply["success"])
 
     def GetVal(self, request, context):
