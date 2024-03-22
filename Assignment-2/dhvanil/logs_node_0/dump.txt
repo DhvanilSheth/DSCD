@@ -1,0 +1,114 @@
+[2024-03-23 02:39:50] Node 0 election timeout. Starting new election.
+[2024-03-23 02:39:51] Error occurred while sending RPC to Node 2.
+[2024-03-23 02:39:51] Error occurred while sending RPC to Node 3.
+[2024-03-23 02:39:51] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:39:56] Node 0 election timeout. Starting new election.
+[2024-03-23 02:39:56] Node 0 is the leader for term 2.
+[2024-03-23 02:39:56] Waiting for Old Leader Lease to timeout.
+[2024-03-23 02:39:56] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:39:57] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:39:57] Error occurred while sending RPC to Node 3.
+[2024-03-23 02:39:57] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:39:57] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:39:57] Error occurred while sending RPC to Node 3.
+[2024-03-23 02:39:58] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:39:58] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:39:59] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:39:59] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:40:00] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:00] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:40:01] Error occurred while sending RPC to Node 4.
+[2024-03-23 02:40:01] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:02] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:04] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:05] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:06] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:07] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:08] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:09] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:10] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:11] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:12] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:13] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:14] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:15] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:16] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:17] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:18] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:19] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:20] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:20] Node 0 (leader) committed the entry SET x 0 to the state machine.
+[2024-03-23 02:40:20] Node 0 (leader) committed the entry SET x 0 to the state machine.
+[2024-03-23 02:40:20] Node 0 (leader) committed the entry SET x 0 to the state machine.
+[2024-03-23 02:40:21] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:22] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:23] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:24] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:25] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:26] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:27] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:27] Node 0 (leader) committed the entry SET dhvanil smart to the state machine.
+[2024-03-23 02:40:28] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:29] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:30] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:31] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:32] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:33] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:34] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:35] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:36] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:37] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:38] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:39] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:40] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:41] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:42] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:43] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:44] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:45] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:46] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:47] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:48] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:49] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:50] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:51] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:52] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:53] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:54] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:55] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:56] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:57] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:58] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:40:59] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:00] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:01] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:02] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:03] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:04] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:05] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:06] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:07] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:08] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:09] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:10] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:11] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:12] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:13] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:14] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:15] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:16] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:17] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:18] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:19] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:20] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:21] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:22] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:23] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:24] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:26] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:27] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:28] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:29] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:30] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:31] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-23 02:41:32] Leader 0 sending heartbeat & Renewing Lease

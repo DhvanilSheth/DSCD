@@ -170,33 +170,31 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
                 thread = self.request_vote_async(node_id, last_term)
                 threads.append(thread)
 
-        timer = threading.Timer(0.5, self.check_election_result) #Edit to 0.1
+        timer = threading.Timer(0.1, self.check_election_result)
         timer.start()
        
     # Create, Send and Request Vote functions for the election process   
     def create_vote_request(self, node_id, last_term):
         """Create a vote request for a specific node"""
-        with grpc.insecure_channel(self.node_addresses[node_id]) as channel:
-            stub = raft_pb2_grpc.RaftStub(channel)
+        channel = grpc.insecure_channel(self.node_addresses[node_id])
+        stub = raft_pb2_grpc.RaftStub(channel)
 
-            request = raft_pb2.RequestVoteArgs(
-                term=self.current_term,
-                candidate_id=self.node_id,
-                last_log_index=len(self.log),
-                last_log_term=last_term
-            )
-        return stub, request
+        request = raft_pb2.RequestVoteArgs(
+            term=self.current_term,
+            candidate_id=self.node_id,
+            last_log_index=len(self.log),
+            last_log_term=last_term
+        )
+        return stub, request, channel
 
-    def send_vote_request(self, stub, request, node_id):
+    def send_vote_request(self, stub, request, node_id, channel):
         """Send a vote request to a specific node"""
         try:
             response = stub.RequestVote(request, timeout=1)
-            
-            # If the vote is granted, add the node to the set of received votes
+
             if response.vote_granted:
                 self.votes_received.add(node_id)
-                
-                # Update the old leader lease timeout based on the response
+
                 remaining_lease_duration = self.old_leader_lease_timeout - (time.time() - self.lease_start_time)
                 if remaining_lease_duration < 0:
                     remaining_lease_duration = 0
@@ -205,11 +203,13 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
         except grpc.RpcError as e:
             # Handle any errors that occur during the RPC
             self.write_to_dump_file(f"Error occurred while sending RPC to Node {node_id}.")
+        finally:
+            channel.close()
 
     def request_vote_async(self, node_id, last_term):
         """Start the request_vote_task in a separate thread and return the thread object"""
-        stub, request = self.create_vote_request(node_id, last_term)
-        thread = threading.Thread(target=self.send_vote_request, args=(stub, request, node_id))
+        stub, request, channel = self.create_vote_request(node_id, last_term)
+        thread = threading.Thread(target=self.send_vote_request, args=(stub, request, node_id, channel))
         thread.start()
         return thread
 
@@ -288,25 +288,25 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
     # Create, Send and Replicate Log functions for the leader to replicate logs to followers    
     def create_log_replication(self, follower_id):
         """Create a log replication for a specific follower"""
-        with grpc.insecure_channel(self.node_addresses[follower_id]) as channel:
-            stub = raft_pb2_grpc.RaftStub(channel)
-            prefix_length = self.sent_length.get(follower_id, 0)
-            suffix = self.log[prefix_length:]
-            prefix_term = 0
-            if prefix_length > 0:
-                prefix_term = self.log[prefix_length - 1].term
-            request = raft_pb2.AppendEntriesArgs(
-                term=self.current_term,
-                leader_id=self.node_id,
-                prev_log_index=prefix_length,
-                prev_log_term=prefix_term,
-                entries=suffix,
-                leader_commit=self.commit_length,
-                lease_duration=LEASE_DURATION
-            )
-        return stub, request, prefix_length, suffix
+        channel = grpc.insecure_channel(self.node_addresses[follower_id])
+        stub = raft_pb2_grpc.RaftStub(channel)
+        prefix_length = self.sent_length.get(follower_id, 0)
+        suffix = self.log[prefix_length:]
+        prefix_term = 0
+        if prefix_length > 0:
+            prefix_term = self.log[prefix_length - 1].term
+        request = raft_pb2.AppendEntriesArgs(
+            term=self.current_term,
+            leader_id=self.node_id,
+            prev_log_index=prefix_length,
+            prev_log_term=prefix_term,
+            entries=suffix,
+            leader_commit=self.commit_length,
+            lease_duration=LEASE_DURATION
+        )
+        return stub, request, prefix_length, suffix, channel
 
-    def send_log_replication(self, stub, request, follower_id, prefix_length, suffix):
+    def send_log_replication(self, stub, request, follower_id, prefix_length, suffix, channel):
         """Send a log replication to a specific follower"""
         try:
             response = stub.AppendEntries(request, timeout=1)
@@ -320,11 +320,13 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
                 self.replicate_log_async(follower_id)
         except grpc.RpcError as e:
             self.write_to_dump_file(f"Error occurred while sending RPC to Node {follower_id}.")
+        finally:
+            channel.close()
 
     def replicate_log_async(self, follower_id):
         """Start the replicate_log_task in a separate thread and return the thread object"""
-        stub, request, prefix_length, suffix = self.create_log_replication(follower_id)
-        thread = threading.Thread(target=self.send_log_replication, args=(stub, request, follower_id, prefix_length, suffix))
+        stub, request, prefix_length, suffix, channel = self.create_log_replication(follower_id)
+        thread = threading.Thread(target=self.send_log_replication, args=(stub, request, follower_id, prefix_length, suffix, channel))
         thread.start()
         return thread
     
@@ -466,7 +468,7 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
 
         # Wait for the entry to be committed
         while self.commit_length < len(self.log):
-            time.sleep(0.5)  # Edit to 0.1
+            time.sleep(0.1)
 
         # Check if the committed entry matches the appended entry
         if self.log[self.commit_length - 1] == log_entry:
