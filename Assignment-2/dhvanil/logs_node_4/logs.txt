@@ -1,3 +1,14 @@
 Term: 1, VotedFor: None
-Term: 1, VotedFor: None
-Term: 1, VotedFor: None
+Term: 2, VotedFor: None
+Server 4 received vote from server 0
+Server 4 received vote from server 1
+Server 4 received vote from server 2
+Term: 3, VotedFor: None
+Server 4 received vote from server 0
+Server 4 received vote from server 1
+Server 4 received vote from server 2
+Term: 4, VotedFor: None
+Server 4 received vote from server 0
+Server 4 received vote from server 1
+Server 4 received vote from server 2
+Server 4 received vote from server 3

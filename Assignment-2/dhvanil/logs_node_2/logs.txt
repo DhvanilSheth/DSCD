@@ -1,3 +1,4 @@
 Term: 1, VotedFor: None
-Term: 1, VotedFor: None
-Term: 1, VotedFor: None
+Term: 2, VotedFor: None
+Term: 3, VotedFor: None
+Term: 4, VotedFor: None

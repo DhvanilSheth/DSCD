@@ -1,4 +1,4 @@
 Term: 1, VotedFor: None
 Term: 2, VotedFor: None
-Server 1 received vote from server 0
 Term: 3, VotedFor: None
+Term: 4, VotedFor: None

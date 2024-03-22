@@ -82,6 +82,8 @@ def client():
             _, rest = cmd.split(maxsplit=1)
             key, value = rest.split(maxsplit=1)
             setVal(key, value)
+        # elif cmd.startswith("no-op"):
+            # NO-OP
         elif cmd == "leader":
             get_leader()
         else:
