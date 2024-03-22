@@ -37,9 +37,12 @@ class Server:
         self.commitIndex = 0 # Index of highest log entry known to be committed
         self.lastApplied = 0 # Index of highest log entry applied to state machine
         
-        self.log_file = open(f"log_{log_number}.txt", "a+") # Log file to store information about the server
+        self.log_file = open(f"logs_node_{log_number}\logs.txt", "a+") # Log file to store information about the server
+        self.dump_file = open(f"logs_node_{log_number}\dump.txt", "a+") # Dump file to store print statements
+        self.metadata_file = open(f"logs_node_{log_number}\metadata.txt", "a+") # Metadata file to store metadata about the server
         self.commitCondition = Condition()  # Condition variable for log commits
 
+        self.load_persisted_data(log_number)
         self.start()
 
     def start(self):
@@ -65,7 +68,7 @@ class Server:
         if self.sleep:
             return
         self.state = state
-        print(f"Server {self.id} is now a {self.state}")
+        print(f"Server {self.id} is now a {self.state}", file=self.dump_file)
 
     def update_term(self, term):
         """Update the server term."""
@@ -73,9 +76,11 @@ class Server:
             return
         self.term = term
         self.votedFor = None
-        print(f"Server {self.id} term is now {self.term}")
-        self.log_file.write(f"Term: {self.term}, VotedFor: {self.votedFor}\n")  # Add this line
-        self.log_file.flush()  # Add this line
+        print(f"Server {self.id} term is now {self.term}", file=self.dump_file)
+        self.log_file.write(f"Term: {self.term}, VotedFor: {self.votedFor}\n")
+        self.log_file.flush()
+        self.metadata_file.write(f"{self.term},{self.votedFor},{self.commitIndex}\n")
+        self.metadata_file.flush()
 
     # For all 3 follower states (Follower, Candidate, Leader)
     # For Follower 
@@ -124,11 +129,14 @@ class Server:
         for thread in self.threads:
             thread.join()
 
+        print("temp working 0")
         # Move majority check here to ensure it's done immediately after votes are collected
         with self.vote_lock:
             if self.votesReceived > len(SERVERS_INFO) // 2 and self.state == "Candidate":
+                print("temp working 1")
                 self.become_leader()
             else:
+                print("temp working 2")
                 self.set_timeout()
                 self.become_follower()
 
@@ -163,6 +171,9 @@ class Server:
         self.nextIndex = {server_id: (len(self.log)+1) for server_id in SERVERS_INFO}
         self.matchIndex = {server_id: 0 for server_id in SERVERS_INFO}
 
+        print("temp working 3")
+        print(f"Server {self.id} is now a leader for term {self.term}", file=self.dump_file)
+
         self.leader_activity()
 
     def leader_activity(self):
@@ -170,7 +181,7 @@ class Server:
         if self.sleep or self.state != "Leader":
             return
         
-        print(f"Server {self.id} as leader sending heartbeats with lease.")
+        print(f"Leader {self.id} sending heartbeat & Renewing Lease", file=self.dump_file)
         self.update_lease(LEASE_DURATION)  # Update leader's lease expiration based on the current time
         
         self.threads = []
@@ -217,9 +228,12 @@ class Server:
             print(f"Leader {self.id}'s lease expired. Stepping down.")
             self.become_follower()
 
+        # with self.commitCondition:
+            # self.commitCondition.notify_all()
+
     def request_vote(self, server_id, server_info):
         """Send a RequestVote RPC to a server."""
-        print(f"Server {self.id} is requesting vote from server {server_id}")
+        print(f"Server {self.id} is requesting vote from server {server_id}", file=self.dump_file)
     
         if self.sleep or self.state != "Candidate":
             return
@@ -251,7 +265,7 @@ class Server:
                     self.log_file.flush()
 
         except grpc.RpcError as e:
-            print(f"Failed to request vote from server {server_id} due to {e}")
+            print(f"Failed to request vote from server {server_id} due to {e}", file=self.dump_file)
             time.sleep(5)
             self.request_vote(server_id, server_info)
 
@@ -308,7 +322,7 @@ class Server:
                 self.matchIndex[server_id] = min(self.nextIndex[server_id] - 1, self.matchIndex[server_id])
 
         except grpc.RpcError as e:
-            print(f"Failed to send heartbeat to server {server_id} due to {e}")
+            print(f"Failed to send heartbeat to server {server_id} due to {e}", file=self.dump_file)
 
     def get_lease_duration(self):
         """Calculates the remaining lease duration."""
@@ -317,6 +331,29 @@ class Server:
     def update_lease(self, oldLeaderLeaseDuration):
         """Updates the lease expiration time."""
         self.leaseExpiration = time.time() + oldLeaderLeaseDuration
+
+    def load_persisted_data(self, node_id):
+        log_path = f"Assignment-2/dhvanil/logs_node_{node_id}/logs.txt"
+        metadata_path = f"Assignment-2/dhvanil/logs_node_{node_id}/metadata.txt"
+        
+        # Ensure directories exist
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+
+        # Load logs
+        if os.path.exists(log_path):
+            with open(log_path, "r") as file:
+                for line in file:
+                    term, command, key, value = line.strip().split(',')
+                    self.log.append({"term": int(term), "command": command, "key": key, "value": value})
+        
+        # Load metadata
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r") as file:
+                last_line = list(file)[-1]
+                term, votedFor, commitIndex = last_line.strip().split(',')
+                self.term = int(term)
+                self.votedFor = int(votedFor) if votedFor.isdigit() else None
+                self.commitIndex = int(commitIndex)
 
 class Handler(pb2_grpc.RaftServiceServicer):
     def __init__(self, server):
@@ -386,6 +423,8 @@ class Handler(pb2_grpc.RaftServiceServicer):
                 else:
                     if len(request.entries) != 0:
                         self.server.log.append({"term" : request.entries[0].term, "update" : {"command" : request.entries[0].update.command, "key" : request.entries[0].update.key, "value" : request.entries[0].update.value}})
+                        self.server.log_file.write(f"{request.entries[0].term},{request.entries[0].update.command},{request.entries[0].update.key},{request.entries[0].update.value}\n")
+                        self.server.log_file.flush()
 
                     if request.leaderCommit > self.server.commitIndex:
                         self.server.commitIndex = min(request.leaderCommit, len(self.server.log))
@@ -411,14 +450,65 @@ class Handler(pb2_grpc.RaftServiceServicer):
             return pb2.LeaderMessage()
         
 
-        reply = {"leaderId": None , "leaderAddress": ""}
-        print(f"Term : {self.server.term} , Command : GetLeader")
+        reply = {"leaderId": None , "leaderAddress": "empty"}
 
-        if self.server.leaderId != None:
+        if self.server.state == "Leader":
+            print(f"Term : {self.server.term} , Leader : {self.server.leaderId}")
             reply = {"leaderId": self.server.leaderId, "leaderAddress": SERVERS_INFO[self.server.leaderId]}
+            return pb2.LeaderMessage(leaderId=reply["leaderId"], leaderAddress=reply["leaderAddress"])
+        
+        else:
+            return pb2.LeaderMessage(leaderId=reply["leaderId"], leaderAddress=reply["leaderAddress"])
+        
+    # def SetVal(self, request, context):
+    #     if self.server.sleep:
+    #         context.set_details("Server is sleeping")
+    #         context.set_code(grpc.StatusCode.UNAVAILABLE)
+    #         return pb2.OperationResponseMessage()
+        
+    #     reply = {"success": False}
+    #     print(f"Recieved SetVal request for key {request.key} and value {request.value}")
 
-        return pb2.LeaderMessage(leaderId=reply["leaderId"], leaderAddress=reply["leaderAddress"])
-    
+    #     if self.server.state == "Leader":
+    #         log_index = len(self.server.log)
+    #         self.server.log.append({"term": self.server.term, "update": {"command": 'SET', "key": request.key, "value": request.value}})
+    #         print(self.server.log)
+            
+    #         # # Wait until the log entry has been committed
+    #         # while self.server.commitCondition:
+    #         #     while self.server.commitIndex < log_index:
+    #         #         self.server.commitCondition.wait()
+            
+    #         reply = {"success": True}
+    #         print(f"Succesfully set value for key {request.key} and value {request.value}")
+    #     # if self.server.state == "Leader":
+    #     #     log_entry = {"term": self.server.term, "command": "SET", "key": request.key, "value": request.value}
+    #     #     self.server.log.append(log_entry)
+            
+    #     #     log_index = len(self.server.log)
+    #     #     self.server.log_file.write(f"{log_entry['term']},{log_entry['command']},{log_entry['key']},{log_entry['value']}\n")
+    #     #     self.server.log_file.flush()
+            
+    #     #     # Wait for the entry to be committed
+    #     #     with self.server.commitCondition:
+    #     #         while self.server.lastApplied < log_index:
+    #     #             self.server.commitCondition.wait()
+            
+    #     #     reply = {"success": True}
+
+    #     elif self.server.state == "Follower":
+    #         channel = grpc.insecure_channel(SERVERS_INFO[self.server.leaderId])
+    #         stub = pb2_grpc.RaftServiceStub(channel)
+    #         message = pb2.KeyValMessage(key = request.key, value = request.value)
+
+    #         try:
+    #             response = stub.SetVal(message)
+    #             reply = {"success": response.success}
+    #         except grpc.RpcError as e:
+    #             print(f"Server is not able to send the message to leader {self.server.leaderId} due to {e}")
+
+    #     return pb2.OperationResponseMessage(success=reply["success"])
+
     def SetVal(self, request, context):
         if self.server.sleep:
             context.set_details("Server is sleeping")
@@ -429,17 +519,15 @@ class Handler(pb2_grpc.RaftServiceServicer):
         print(f"Recieved SetVal request for key {request.key} and value {request.value}")
 
         if self.server.state == "Leader":
-            log_index = len(self.server.log)
-            self.server.log.append({"term": self.server.term, "update": {"command": 'SET', "key": request.key, "value": request.value}})
+            log_entry = {"term": self.server.term, "update": {"command": 'SET', "key": request.key, "value": request.value}}
+            self.server.log.append(log_entry)
             print(self.server.log)
             
-            # # Wait until the log entry has been committed
-            # while self.server.commitCondition:
-            #     while self.server.commitIndex < log_index:
-            #         self.server.commitCondition.wait()
+            log_index = len(self.server.log)
+            self.server.log_file.write(f"{log_entry['term']},{log_entry['command']},{log_entry['key']},{log_entry['value']}\n")
+            self.server.log_file.flush()
             
             reply = {"success": True}
-            print(f"Succesfully set value for key {request.key} and value {request.value}")
 
         elif self.server.state == "Follower":
             channel = grpc.insecure_channel(SERVERS_INFO[self.server.leaderId])
@@ -452,20 +540,9 @@ class Handler(pb2_grpc.RaftServiceServicer):
             except grpc.RpcError as e:
                 print(f"Server is not able to send the message to leader {self.server.leaderId} due to {e}")
 
+        print(reply)
         return pb2.OperationResponseMessage(success=reply["success"])
 
-    # def GetVal(self, request, context):
-    #     if self.server.sleep:
-    #         context.set_details("Server is sleeping")
-    #         context.set_code(grpc.StatusCode.UNAVAILABLE)
-    #         return pb2.ValResponseMessage()
-        
-    #     reply = {"success": False, "value": "None"}
-
-    #     if request.key in self.server.log["update"]["key"]:
-    #         reply = {"success": True, "value": self.server.log[request.key]}
-
-    #     return pb2.ValResponseMessage(success=reply["success"], value=reply["value"])
     def GetVal(self, request, context):
         if self.server.sleep:
             context.set_details("Server is sleeping")
