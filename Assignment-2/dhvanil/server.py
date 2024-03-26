@@ -503,6 +503,7 @@ def serve(node_id, node_addresses):
     node = Raft(node_id, node_addresses)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_RaftServicer_to_server(node, server)
+    # server.add_insecure_port("0.0.0.0" + node_addresses[node_id][node_addresses[node_id].find(':'):])
     server.add_insecure_port(node_addresses[node_id])
     server.start()
     print(f"Started {node_id} server at {node_addresses[node_id]}")
@@ -527,6 +528,13 @@ def main():
         3: "localhost:50053",
         4: "localhost:50054",
     }
+#     node_addresses = {
+#         0: "35.226.237.128:50050",
+#         1: "35.226.206.149:50051",
+#         2: "35.222.95.185:50052",
+#         3: "35.202.160.202:50053",
+#         4: "34.41.170.86:50054",
+#     }
     if clear_data.lower() == "true":
         clean_logs(node_id)
 
