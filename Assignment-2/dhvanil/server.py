@@ -517,7 +517,7 @@ def serve(node_id, node_addresses):
 def main():
     """Main function to parse command line arguments and start the Raft server"""
     if len(sys.argv) < 2:
-        print("Usage: python raft.py <node_id> <clear data (optional)>")
+        print("Usage: python server.py <node_id> <clear data (optional)>")
         sys.exit(1)
     node_id = int(sys.argv[1])
     clear_data = sys.argv[2] if len(sys.argv) > 2 else "false"
