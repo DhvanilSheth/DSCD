@@ -7,20 +7,19 @@ import threading
 import os
 import sys
 from concurrent import futures
-# import datetime
 
-# Constants
-HEARTBEAT_INTERVAL = 1.0  # Heartbeat interval in seconds
-ELECTION_TIMEOUT_MIN = 5.0  # Minimum election timeout in seconds
-ELECTION_TIMEOUT_MAX = 10.0  # Maximum election timeout in seconds
-LEASE_DURATION = 10  # Leader lease duration in seconds
+# Setting constants 
+HEARTBEAT_INTERVAL = 1.0
+ELECTION_TIMEOUT_MIN = 5.0
+ELECTION_TIMEOUT_MAX = 10.0
+LEASE_DURATION = 10
 
-# Raft node states
+# States of the Raft node
 FOLLOWER = 0
 CANDIDATE = 1
 LEADER = 2
 
-class RaftNode(raft_pb2_grpc.RaftServicer):
+class Raft(raft_pb2_grpc.RaftServicer):
     def __init__(self, node_id, node_addresses):
         self.node_id = node_id
         self.node_addresses = node_addresses
@@ -54,7 +53,6 @@ class RaftNode(raft_pb2_grpc.RaftServicer):
 
     def write_to_dump_file(self, message):
         """Write a message to the dump file with a timestamp."""
-        # timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"[{timestamp}] {message}"
         print(log_message)
@@ -502,7 +500,7 @@ def clean_logs(node_id):
 
 def serve(node_id, node_addresses):
     """Start the Raft server for a node"""
-    node = RaftNode(node_id, node_addresses)
+    node = Raft(node_id, node_addresses)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_RaftServicer_to_server(node, server)
     server.add_insecure_port(node_addresses[node_id])
