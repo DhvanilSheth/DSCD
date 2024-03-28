@@ -1,5 +1,0 @@
-NO-OP 2
-SET x 0 2
-SET dhvanil smart 2
-NO-OP 4
-SET y 0 4
