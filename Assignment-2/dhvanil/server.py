@@ -516,11 +516,12 @@ def serve(node_id, node_addresses):
 
 def main():
     """Main function to parse command line arguments and start the Raft server"""
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 4:
         print("Usage: python server.py <node_id> <clear data (optional)>")
         sys.exit(1)
     node_id = int(sys.argv[1])
-    clear_data = sys.argv[2] if len(sys.argv) > 2 else "false"
+    num_of_nodes = int(sys.argv[2])
+    clear_data = sys.argv[3] if len(sys.argv) > 3 else "false"
     # node_addresses = {
     #     0: "localhost:50050",
     #     1: "localhost:50051",
@@ -528,13 +529,14 @@ def main():
     #     3: "localhost:50053",
     #     4: "localhost:50054",
     # }
-    node_addresses = {
-        0: "10.128.0.2:50050",
-        1: "10.128.0.3:50051",
-        2: "10.128.0.4:50052",
-        3: "10.128.0.5:50053",
-        4: "10.128.0.6:50054",
-    }
+    node_addresses={i:f"10.128.0.{i+2}:5005{i}" for i in range(num_of_nodes)}
+    # node_addresses = {
+        # 0: "34.41.170.86:50050",
+        # 1: "35.202.160.202:50051",
+        # 2: "35.222.95.185:50052",
+        # 3: "35.226.206.149:50053",
+        # 4: "35.238.193.92:50054",
+        # }
     if clear_data.lower() == "true":
         clean_logs(node_id)
 
