@@ -8,50 +8,47 @@ import os
 import sys
 from concurrent import futures
 
-# Setting constants 
-HEARTBEAT_INTERVAL = 1.0
+# Setting time constants and state constants
+HEARTBEAT_INTERVAL_SECONDS = 1.0
 ELECTION_TIMEOUT_MIN = 5.0
 ELECTION_TIMEOUT_MAX = 10.0
-LEASE_DURATION = 10
-
-# States of the Raft node
-FOLLOWER = 0
-CANDIDATE = 1
-LEADER = 2
+LEASE_DURATION_SECONDS = 10
+FOLLOWER_STATE = 0
+CANDIDATE_STATE = 1
+LEADER_STATE = 2
 
 class Raft(raft_pb2_grpc.RaftServicer):
-    def __init__(self, node_id, node_addresses):
-        self.node_id = node_id
-        self.node_addresses = node_addresses
-        self.state = FOLLOWER
-        self.current_term = 0
-        self.voted_for = None
+    def __init__(self, nodeID, nodeAddresses):
+        self.nodeID = nodeID
+        self.nodeAddresses = nodeAddresses
+        self.state = FOLLOWER_STATE
+        self.currentTerm = 0
+        self.votedFor = None
         self.log = []
-        self.commit_length = 0
-        self.current_leader = None
-        self.votes_received = set()
-        self.sent_length = {}
-        self.acked_length = {}
-        self.election_timer = None
-        self.heartbeat_timer = None
-        self.lease_timer = None
-        self.old_leader_lease_timeout = 0
-        self.heartbeat_success_count = set()
-        self.lease_start_time = 0
-        self.data_store = {}
-        self.load_state()
-        self.create_dump_file()
+        self.commitLen = 0
+        self.currentLeader = None
+        self.receivedVotes = set()
+        self.logLengthSent = {}
+        self.logLengthAcknowledged = {}
+        self.electionTimeout = None
+        self.heartbeatCycle = None
+        self.leasePeriod = None
+        self.prevLeaderLeaseTimeout = 0
+        self.leaseStartTime = 0
+        self.DataStorage = {}
+        self.loadNodeState()
+        self.initLogDirectory()
 
     # Create and write functions to dump info
-    def create_dump_file(self):
+    def initLogDirectory(self):
         """Create the dump file for the node."""
-        os.makedirs(f"logs_node_{self.node_id}", exist_ok=True)
+        os.makedirs(f"logs_node_{self.nodeID}", exist_ok=True)
         try:
-            self.dump_file = open(f"logs_node_{self.node_id}/dump.txt", "a")
+            self.dump_file = open(f"logs_node_{self.nodeID}/dump.txt", "a")
         except FileNotFoundError:
-            self.dump_file = open(f"logs_node_{self.node_id}/dump.txt", "w")
+            self.dump_file = open(f"logs_node_{self.nodeID}/dump.txt", "w")
 
-    def write_to_dump_file(self, message):
+    def logMessage(self, message):
         """Write a message to the dump file with a timestamp."""
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         log_message = f"[{timestamp}] {message}"
@@ -60,16 +57,16 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.dump_file.flush()
 
     # Store and Load state functions to persist the logs and metadata
-    def load_state(self):
+    def loadNodeState(self):
         """Load the state from disk to recover the logs and metadata"""
-        log_file_path = f"logs_node_{self.node_id}/logs.txt"
-        metadata_file_path = f"logs_node_{self.node_id}/metadata.txt"
+        log_file_path = f"logs_node_{self.nodeID}/logs.txt"
+        metadata_file_path = f"logs_node_{self.nodeID}/metadata.txt"
 
         try:
             with open(metadata_file_path, "r") as metadata_file:
-                self.commit_length = int(metadata_file.readline().strip())
-                self.current_term = int(metadata_file.readline().strip())
-                self.voted_for = metadata_file.readline().strip() or None
+                self.commitLen = int(metadata_file.readline().strip())
+                self.currentTerm = int(metadata_file.readline().strip())
+                self.votedFor = metadata_file.readline().strip() or None
 
             with open(log_file_path, "r") as log_file:
                 for line in log_file:
@@ -80,17 +77,17 @@ class Raft(raft_pb2_grpc.RaftServicer):
                     elif parts[0] == "SET":
                         key, value, term = parts[1], parts[2], int(parts[3])
                         self.log.append(raft_pb2.LogEntry(operation="SET", key=key, value=value, term=term))
-                        if len(self.log) <= self.commit_length:
-                            self.data_store[key] = value
+                        if len(self.log) <= self.commitLen:
+                            self.DataStorage[key] = value
         except FileNotFoundError:
             pass
 
-    def store_state(self):
+    def saveNodeState(self):
         """Save the current state on disk to persist the logs and metadata"""
-        log_file_path = f"logs_node_{self.node_id}/logs.txt"
-        metadata_file_path = f"logs_node_{self.node_id}/metadata.txt"
+        log_file_path = f"logs_node_{self.nodeID}/logs.txt"
+        metadata_file_path = f"logs_node_{self.nodeID}/metadata.txt"
 
-        os.makedirs(f"logs_node_{self.node_id}", exist_ok=True)
+        os.makedirs(f"logs_node_{self.nodeID}", exist_ok=True)
 
         with open(log_file_path, "w") as log_file:
             for entry in self.log:
@@ -100,261 +97,261 @@ class Raft(raft_pb2_grpc.RaftServicer):
                     log_file.write(f"SET {entry.key} {entry.value} {entry.term}\n")
 
         with open(metadata_file_path, "w") as metadata_file:
-            metadata_file.write(f"{self.commit_length}\n")
-            metadata_file.write(f"{self.current_term}\n")
-            metadata_file.write(f"{self.voted_for or ''}\n")
+            metadata_file.write(f"{self.commitLen}\n")
+            metadata_file.write(f"{self.currentTerm}\n")
+            metadata_file.write(f"{self.votedFor or ''}\n")
 
     # Start Timer functions for election, heartbeat and lease
     # Threading.Timer is used to start a timer that will run a function after a specified number of seconds
-    def start_election_timer(self):
+    def startElectionTimeout(self):
         """Start the election timer with a random duration"""
         election_timeout = random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
-        self.election_timer = threading.Timer(election_timeout, self.start_election)
-        self.election_timer.start()
+        self.electionTimeout = threading.Timer(election_timeout, self.initiateElection)
+        self.electionTimeout.start()
 
-    def start_heartbeat_timer(self):
+    def initHeartbeatTimer(self):
         """Start the heartbeat timer with a fixed interval"""
-        self.heartbeat_timer = threading.Timer(HEARTBEAT_INTERVAL, self.send_heartbeats)
-        self.heartbeat_timer.start()
+        self.heartbeatCycle = threading.Timer(HEARTBEAT_INTERVAL_SECONDS, self.broadcastHeartbeats)
+        self.heartbeatCycle.start()
 
-    def start_lease_timer(self):
+    def beginLeasePeriod(self):
         """Start the lease timer with a fixed duration"""
-        self.lease_start_time = time.time()
-        self.lease_timer = threading.Timer(LEASE_DURATION, self.lease_timeout)
-        self.lease_timer.start()
+        self.leaseStartTime = time.time()
+        self.leasePeriod = threading.Timer(LEASE_DURATION_SECONDS, self.leaseTimeout)
+        self.leasePeriod.start()
 
     # Cancel Timer functions for election, heartbeat and lease
-    def cancel_election_timer(self):
+    def stopElectionTimeout(self):
         """Cancel the election timer if it is active"""
-        if self.election_timer:
-            self.election_timer.cancel()
+        if self.electionTimeout:
+            self.electionTimeout.cancel()
 
-    def cancel_heartbeat_timer(self):
+    def haltHeartbeatCycle(self):
         """Cancel the heartbeat timer if it is active"""
-        if self.heartbeat_timer:
-            self.heartbeat_timer.cancel()
+        if self.heartbeatCycle:
+            self.heartbeatCycle.cancel()
 
-    def cancel_lease_timer(self):
+    def endLeasePeriod(self):
         """Cancel the lease timer if it is active"""
-        if self.lease_timer:
-            self.lease_timer.cancel()
+        if self.leasePeriod:
+            self.leasePeriod.cancel()
 
     # Start and Check Election functions for the election process
-    def check_election_result(self):
+    def verifyElectionOutcome(self):
         """Check the result of the election after the election timer expires"""
-        if len(self.votes_received) < (len(self.node_addresses) // 2) + 1:
-            self.start_election_timer()
+        if len(self.receivedVotes) < (len(self.nodeAddresses) // 2) + 1:
+            self.startElectionTimeout()
         else:
-            self.become_leader()
+            self.assumeLeadership()
 
-    def start_election(self):
+    def initiateElection(self):
         """Start the election process by incrementing the term and requesting votes from other nodes"""
-        self.write_to_dump_file(f"Node {self.node_id} election timeout. Starting new election.")
-        self.state = CANDIDATE
-        self.current_term += 1
-        self.voted_for = self.node_id
-        self.votes_received = {self.node_id}
+        self.logMessage(f"Node {self.nodeID} election timeout. Starting new election.")
+        self.state = CANDIDATE_STATE
+        self.currentTerm += 1
+        self.votedFor = self.nodeID
+        self.receivedVotes = {self.nodeID}
 
         last_term = 0
         if self.log:
             last_term = self.log[-1].term
-        self.store_state()
+        self.saveNodeState()
 
         threads = []
-        for node_id, _ in self.node_addresses.items():
-            if node_id == self.node_id:
+        for nodeID, _ in self.nodeAddresses.items():
+            if nodeID == self.nodeID:
                 continue
             else:
-                thread = self.request_vote_async(node_id, last_term)
+                thread = self.asyncVoteRequest(nodeID, last_term)
                 threads.append(thread)
 
-        timer = threading.Timer(0.1, self.check_election_result)
+        timer = threading.Timer(0.1, self.verifyElectionOutcome)
         timer.start()
        
     # Create, Send and Request Vote functions for the election process   
-    def create_vote_request(self, node_id, last_term):
+    def prepareVoteRequest(self, nodeID, last_term):
         """Create a vote request for a specific node"""
-        channel = grpc.insecure_channel(self.node_addresses[node_id])
+        channel = grpc.insecure_channel(self.nodeAddresses[nodeID])
         stub = raft_pb2_grpc.RaftStub(channel)
 
         request = raft_pb2.RequestVoteArgs(
-            term=self.current_term,
-            candidate_id=self.node_id,
+            term=self.currentTerm,
+            candidate_id=self.nodeID,
             last_log_index=len(self.log),
             last_log_term=last_term
         )
         return stub, request, channel
 
-    def send_vote_request(self, stub, request, node_id, channel):
+    def sendVoteRequest(self, stub, request, nodeID, channel):
         """Send a vote request to a specific node"""
         try:
             response = stub.RequestVote(request, timeout=1)
 
             if response.vote_granted:
-                self.votes_received.add(node_id)
+                self.receivedVotes.add(nodeID)
 
-                remaining_lease_duration = self.old_leader_lease_timeout - (time.time() - self.lease_start_time)
+                remaining_lease_duration = self.prevLeaderLeaseTimeout - (time.time() - self.leaseStartTime)
                 if remaining_lease_duration < 0:
                     remaining_lease_duration = 0
-                self.old_leader_lease_timeout = max(remaining_lease_duration, response.old_leader_lease_timeout)
+                self.prevLeaderLeaseTimeout = max(remaining_lease_duration, response.prevLeaderLeaseTimeout)
                     
         except grpc.RpcError as e:
             # Handle any errors that occur during the RPC
-            self.write_to_dump_file(f"Error occurred while sending RPC to Node {node_id}.")
+            self.logMessage(f"Error occurred while sending RPC to Node {nodeID}.")
         finally:
             channel.close()
 
-    def request_vote_async(self, node_id, last_term):
+    def asyncVoteRequest(self, nodeID, last_term):
         """Start the request_vote_task in a separate thread and return the thread object"""
-        stub, request, channel = self.create_vote_request(node_id, last_term)
-        thread = threading.Thread(target=self.send_vote_request, args=(stub, request, node_id, channel))
+        stub, request, channel = self.prepareVoteRequest(nodeID, last_term)
+        thread = threading.Thread(target=self.sendVoteRequest, args=(stub, request, nodeID, channel))
         thread.start()
         return thread
 
     # Become Leader function to handle the leader election process
-    def become_leader(self):
+    def assumeLeadership(self):
         """Handle the leader election process after receiving votes from a majority of nodes"""
-        self.write_to_dump_file(f"Node {self.node_id} is the leader for term {self.current_term}.")
-        self.state = LEADER
-        self.current_leader = self.node_id
-        self.votes_received = set()
-        self.sent_length = {node_id: len(self.log) for node_id in self.node_addresses}
-        self.acked_length = {node_id: 0 for node_id in self.node_addresses}
-        self.cancel_election_timer()
+        self.logMessage(f"Node {self.nodeID} is the leader for term {self.currentTerm}.")
+        self.state = LEADER_STATE
+        self.currentLeader = self.nodeID
+        self.receivedVotes = set()
+        self.logLengthSent = {nodeID: len(self.log) for nodeID in self.nodeAddresses}
+        self.logLengthAcknowledged = {nodeID: 0 for nodeID in self.nodeAddresses}
+        self.stopElectionTimeout()
 
-        self.write_to_dump_file("Waiting for Old Leader Lease to timeout.")
-        time.sleep(self.old_leader_lease_timeout)
+        self.logMessage("Waiting for Old Leader Lease to timeout.")
+        time.sleep(self.prevLeaderLeaseTimeout)
 
-        self.start_lease_timer()
-        self.append_no_op_entry()
-        self.send_heartbeats()
+        self.beginLeasePeriod()
+        self.insertNoOp()
+        self.broadcastHeartbeats()
 
-    def lease_timeout(self):
+    def leaseTimeout(self):
         """Handle the case when the leader lease expires without renewing the lease"""
-        self.write_to_dump_file(f"Leader {self.node_id} lease renewal failed. Stepping Down.")
-        self.step_down()
+        self.logMessage(f"Leader {self.nodeID} lease renewal failed. Stepping Down.")
+        self.revertToFollower()
 
-    def step_down(self):
+    def revertToFollower(self):
         """Step down from the leader role and become a follower"""
-        self.write_to_dump_file(f"{self.node_id} Stepping down")
-        self.state = FOLLOWER
-        self.current_leader = None
-        self.votes_received = set()
-        self.sent_length = {}
-        self.acked_length = {}
-        self.cancel_heartbeat_timer()
-        self.cancel_lease_timer()
-        self.cancel_election_timer()
-        self.start_election_timer()
+        self.logMessage(f"{self.nodeID} Stepping down")
+        self.state = FOLLOWER_STATE
+        self.currentLeader = None
+        self.receivedVotes = set()
+        self.logLengthSent = {}
+        self.logLengthAcknowledged = {}
+        self.haltHeartbeatCycle()
+        self.endLeasePeriod()
+        self.stopElectionTimeout()
+        self.startElectionTimeout()
 
-    def append_no_op_entry(self):
+    def insertNoOp(self):
         """Append a NO-OP entry to the log to maintain the leader lease"""
-        self.log.append(raft_pb2.LogEntry(operation="NO-OP", term=self.current_term))
-        self.store_state()
+        self.log.append(raft_pb2.LogEntry(operation="NO-OP", term=self.currentTerm))
+        self.saveNodeState()
 
     # Create, Send and Heartbeat functions for the leader to send heartbeats to followers
-    def create_heartbeat(self):
+    def generateHeartbeats(self):
         """Create a heartbeat for all the followers"""
         threads = []
         self.heartbeat_success_nodes = set()
-        for node_id, node_address in self.node_addresses.items():
-            if node_id != self.node_id:
-                thread = self.replicate_log_async(node_id)
+        for nodeID, node_address in self.nodeAddresses.items():
+            if nodeID != self.nodeID:
+                thread = self.asyncLogReplication(nodeID)
                 threads.append(thread)
         return threads
 
-    def send_heartbeat(self):
+    def broadcastHeartbeat(self):
         """Send the heartbeat to all the followers and check the lease renewal"""
         def check_lease_renewal():
-            if len(self.heartbeat_success_nodes) < (len(self.node_addresses) // 2):
-                self.write_to_dump_file(f"Leader {self.node_id} failed to renew lease. Stepping down.")
-                self.step_down()
+            if len(self.heartbeat_success_nodes) < (len(self.nodeAddresses) // 2):
+                self.logMessage(f"Leader {self.nodeID} failed to renew lease. Stepping down.")
+                self.revertToFollower()
 
-        remaining_lease_time = self.lease_timer.interval - (time.time() - self.lease_start_time)
+        remaining_lease_time = self.leasePeriod.interval - (time.time() - self.leaseStartTime)
         timer = threading.Timer(remaining_lease_time, check_lease_renewal)
         timer.start()
-        self.start_heartbeat_timer()
+        self.initHeartbeatTimer()
 
-    def send_heartbeats(self):
-        """Using the create_heartbeat and send_heartbeat functions"""
-        self.write_to_dump_file(f"Leader {self.node_id} sending heartbeat & Renewing Lease")
-        self.lease_timer.cancel()
-        self.start_lease_timer()
-        self.create_heartbeat()
-        self.send_heartbeat()
+    def broadcastHeartbeats(self):
+        """Using the generateHeartbeats and broadcastHeartbeat functions"""
+        self.logMessage(f"Leader {self.nodeID} sending heartbeat & Renewing Lease")
+        self.leasePeriod.cancel()
+        self.beginLeasePeriod()
+        self.generateHeartbeats()
+        self.broadcastHeartbeat()
         
     # Create, Send and Replicate Log functions for the leader to replicate logs to followers    
-    def create_log_replication(self, follower_id):
+    def prepareLogReplication(self, follower_id):
         """Create a log replication for a specific follower"""
-        channel = grpc.insecure_channel(self.node_addresses[follower_id])
+        channel = grpc.insecure_channel(self.nodeAddresses[follower_id])
         stub = raft_pb2_grpc.RaftStub(channel)
-        prefix_length = self.sent_length.get(follower_id, 0)
+        prefix_length = self.logLengthSent.get(follower_id, 0)
         suffix = self.log[prefix_length:]
         prefix_term = 0
         if prefix_length > 0:
             prefix_term = self.log[prefix_length - 1].term
         request = raft_pb2.AppendEntriesArgs(
-            term=self.current_term,
-            leader_id=self.node_id,
+            term=self.currentTerm,
+            leader_id=self.nodeID,
             prev_log_index=prefix_length,
             prev_log_term=prefix_term,
             entries=suffix,
-            leader_commit=self.commit_length,
-            lease_duration=LEASE_DURATION
+            leader_commit=self.commitLen,
+            lease_duration=LEASE_DURATION_SECONDS
         )
         return stub, request, prefix_length, suffix, channel
 
-    def send_log_replication(self, stub, request, follower_id, prefix_length, suffix, channel):
+    def executeLogReplication(self, stub, request, follower_id, prefix_length, suffix, channel):
         """Send a log replication to a specific follower"""
         try:
             response = stub.AppendEntries(request, timeout=1)
             if response.success:
-                self.sent_length[follower_id] = prefix_length + len(suffix)
-                self.acked_length[follower_id] = prefix_length + len(suffix)
-                self.commit_log_entries()
+                self.logLengthSent[follower_id] = prefix_length + len(suffix)
+                self.logLengthAcknowledged[follower_id] = prefix_length + len(suffix)
+                self.commitLogEntries()
                 self.heartbeat_success_nodes.add(follower_id)
             else:
-                self.sent_length[follower_id] = max(0, self.sent_length.get(follower_id, 0) - 1)
-                self.replicate_log_async(follower_id)
+                self.logLengthSent[follower_id] = max(0, self.logLengthSent.get(follower_id, 0) - 1)
+                self.asyncLogReplication(follower_id)
         except grpc.RpcError as e:
-            self.write_to_dump_file(f"Error occurred while sending RPC to Node {follower_id}.")
+            self.logMessage(f"Error occurred while sending RPC to Node {follower_id}.")
         finally:
             channel.close()
 
-    def replicate_log_async(self, follower_id):
+    def asyncLogReplication(self, follower_id):
         """Start the replicate_log_task in a separate thread and return the thread object"""
-        stub, request, prefix_length, suffix, channel = self.create_log_replication(follower_id)
-        thread = threading.Thread(target=self.send_log_replication, args=(stub, request, follower_id, prefix_length, suffix, channel))
+        stub, request, prefix_length, suffix, channel = self.prepareLogReplication(follower_id)
+        thread = threading.Thread(target=self.executeLogReplication, args=(stub, request, follower_id, prefix_length, suffix, channel))
         thread.start()
         return thread
     
     # Commit Log Entries function to commit the log entries
-    def commit_log_entries(self):
+    def commitLogEntries(self):
         """Commit log entries if a majority of nodes have replicated them"""
-        min_acks = len(self.node_addresses) // 2
+        min_acks = len(self.nodeAddresses) // 2
         ready_entries = [index for index in range(1, len(self.log) + 1)
-                         if len([node_id for node_id, acked_length in self.acked_length.items()
-                                 if acked_length >= index]) >= min_acks]
+                         if len([nodeID for nodeID, logLengthAcknowledged in self.logLengthAcknowledged.items()
+                                 if logLengthAcknowledged >= index]) >= min_acks]
 
         if ready_entries:
             max_ready_entry = max(ready_entries)
-            if max_ready_entry > self.commit_length and self.log[max_ready_entry - 1].term == self.current_term:
-                for i in range(self.commit_length, max_ready_entry):
+            if max_ready_entry > self.commitLen and self.log[max_ready_entry - 1].term == self.currentTerm:
+                for i in range(self.commitLen, max_ready_entry):
                     entry = self.log[i]
                     if entry.operation == "SET":
-                        self.data_store[entry.key] = entry.value
-                        self.write_to_dump_file(f"Node {self.node_id} (leader) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
-                self.commit_length = max_ready_entry
-                self.store_state()
+                        self.DataStorage[entry.key] = entry.value
+                        self.logMessage(f"Node {self.nodeID} (leader) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
+                self.commitLen = max_ready_entry
+                self.saveNodeState()
 
     # Update Current Term, Log Up To Date, Grant Vote, Deny Vote functions for Request Vote RPC
     def update_current_term_if_needed(self, vote_request):
         """Update the current term if the vote request term is greater than the current term"""
-        if vote_request.term > self.current_term:
-            self.current_term = vote_request.term
-            self.voted_for = None
-            self.store_state()
-            self.step_down()
+        if vote_request.term > self.currentTerm:
+            self.currentTerm = vote_request.term
+            self.votedFor = None
+            self.saveNodeState()
+            self.revertToFollower()
 
     def is_log_up_to_date(self, vote_request):
         """Check if the log is up to date with the vote request log"""
@@ -365,30 +362,30 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def grant_vote_to_candidate(self, vote_request):
         """Grant vote to the candidate if the log is up to date and the candidate has not voted for another candidate"""
-        self.voted_for = vote_request.candidate_id
-        self.store_state()
-        self.write_to_dump_file(f"Vote granted for Node {vote_request.candidate_id} in term {vote_request.term}.")
-        remaining_lease_duration = max(0, self.old_leader_lease_timeout - (time.time() - self.lease_start_time))
+        self.votedFor = vote_request.candidate_id
+        self.saveNodeState()
+        self.logMessage(f"Vote granted for Node {vote_request.candidate_id} in term {vote_request.term}.")
+        remaining_lease_duration = max(0, self.prevLeaderLeaseTimeout - (time.time() - self.leaseStartTime))
         return raft_pb2.RequestVoteReply(
-            term=self.current_term,
+            term=self.currentTerm,
             vote_granted=True,
-            old_leader_lease_timeout=remaining_lease_duration
+            prevLeaderLeaseTimeout=remaining_lease_duration
         )
 
     def deny_vote_to_candidate(self, vote_request):
         """Deny vote to the candidate if the log is not up to date or the candidate has voted for another candidate"""
-        self.write_to_dump_file(f"Vote denied for Node {vote_request.candidate_id} in term {vote_request.term}.")
+        self.logMessage(f"Vote denied for Node {vote_request.candidate_id} in term {vote_request.term}.")
         return raft_pb2.RequestVoteReply(
-            term=self.current_term,
+            term=self.currentTerm,
             vote_granted=False,
-            old_leader_lease_timeout=self.old_leader_lease_timeout
+            prevLeaderLeaseTimeout=self.prevLeaderLeaseTimeout
         )
 
     def RequestVote(self, vote_request, context):
         """Handle the RequestVote RPC from a candidate"""
         self.update_current_term_if_needed(vote_request)
 
-        if vote_request.term != self.current_term or self.voted_for not in (None, vote_request.candidate_id):
+        if vote_request.term != self.currentTerm or self.votedFor not in (None, vote_request.candidate_id):
             return self.deny_vote_to_candidate(vote_request)
 
         if self.is_log_up_to_date(vote_request):
@@ -399,21 +396,21 @@ class Raft(raft_pb2_grpc.RaftServicer):
     # Update Current Term, Follower State, Log Consistent, Append Entries to Log functions for Append Entries RPC
     def update_current_term_if_needed(self, append_entries_request):
         """Update the current term if the append entries request term is greater than the current term"""
-        if append_entries_request.term > self.current_term:
-            self.current_term = append_entries_request.term
-            self.voted_for = None
-            self.store_state()
-            self.step_down()
+        if append_entries_request.term > self.currentTerm:
+            self.currentTerm = append_entries_request.term
+            self.votedFor = None
+            self.saveNodeState()
+            self.revertToFollower()
 
     def update_follower_state(self, append_entries_request):
         """Update the follower state if the append entries request term is equal to the current term"""
-        if append_entries_request.term == self.current_term:
-            self.state = FOLLOWER
-            self.current_leader = append_entries_request.leader_id
-            self.cancel_election_timer()
-            self.old_leader_lease_timeout = append_entries_request.lease_duration
-            self.lease_start_time = time.time()
-            self.start_election_timer()
+        if append_entries_request.term == self.currentTerm:
+            self.state = FOLLOWER_STATE
+            self.currentLeader = append_entries_request.leader_id
+            self.stopElectionTimeout()
+            self.prevLeaderLeaseTimeout = append_entries_request.lease_duration
+            self.leaseStartTime = time.time()
+            self.startElectionTimeout()
 
     def is_log_consistent(self, append_entries_request):
         """Check if the log is consistent with the append entries request"""
@@ -429,85 +426,85 @@ class Raft(raft_pb2_grpc.RaftServicer):
                 self.log = self.log[:prev_log_index]
         if prev_log_index + len(entries) > len(self.log):
             self.log.extend(entries[len(self.log) - prev_log_index:])
-        if leader_commit > self.commit_length:
-            for i in range(self.commit_length, leader_commit):
+        if leader_commit > self.commitLen:
+            for i in range(self.commitLen, leader_commit):
                 entry = self.log[i]
                 if entry.operation == "SET":
-                    self.data_store[entry.key] = entry.value
-                    self.write_to_dump_file(f"Node {self.node_id} (follower) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
-            self.commit_length = leader_commit
-        self.store_state()
+                    self.DataStorage[entry.key] = entry.value
+                    self.logMessage(f"Node {self.nodeID} (follower) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
+            self.commitLen = leader_commit
+        self.saveNodeState()
 
     def AppendEntries(self, append_entries_request, context):
         """Handle the AppendEntries RPC from the leader"""
         self.update_current_term_if_needed(append_entries_request)
         self.update_follower_state(append_entries_request)
 
-        if append_entries_request.term == self.current_term and self.is_log_consistent(append_entries_request):
+        if append_entries_request.term == self.currentTerm and self.is_log_consistent(append_entries_request):
             self.append_entries_to_log(append_entries_request.prev_log_index, append_entries_request.leader_commit, append_entries_request.entries)
             ack = append_entries_request.prev_log_index + len(append_entries_request.entries)
-            self.write_to_dump_file(f"Node {self.node_id} accepted AppendEntries RPC from {append_entries_request.leader_id}.")
-            return raft_pb2.AppendEntriesReply(term=self.current_term, success=True, ack=ack)
+            self.logMessage(f"Node {self.nodeID} accepted AppendEntries RPC from {append_entries_request.leader_id}.")
+            return raft_pb2.AppendEntriesReply(term=self.currentTerm, success=True, ack=ack)
         else:
-            self.write_to_dump_file(f"Node {self.node_id} rejected AppendEntries RPC from {append_entries_request.leader_id}.")
-            return raft_pb2.AppendEntriesReply(term=self.current_term, success=False, ack=0)
+            self.logMessage(f"Node {self.nodeID} rejected AppendEntries RPC from {append_entries_request.leader_id}.")
+            return raft_pb2.AppendEntriesReply(term=self.currentTerm, success=False, ack=0)
 
     # Handle Get and Set Request functions for the client requests
-    def handle_get_request(self, key):
+    def processGetRequest(self, key):
         """Handle the GET request from the client"""
-        value = self.data_store.get(key, "")
-        return raft_pb2.ServeClientReply(Data=value, LeaderID=str(self.node_id), Success=True)
+        value = self.DataStorage.get(key, "")
+        return raft_pb2.ServeClientReply(Data=value, LeaderID=str(self.nodeID), Success=True)
 
-    def handle_set_request(self, key, value):
+    def processSetRequest(self, key, value):
         """Handle the SET request from the client"""
-        log_entry = raft_pb2.LogEntry(operation="SET", key=key, value=value, term=self.current_term)
+        log_entry = raft_pb2.LogEntry(operation="SET", key=key, value=value, term=self.currentTerm)
         self.log.append(log_entry)
-        self.store_state()
+        self.saveNodeState()
 
         # Wait for the entry to be committed
-        while self.commit_length < len(self.log):
+        while self.commitLen < len(self.log):
             time.sleep(0.1)
 
         # Check if the committed entry matches the appended entry
-        if self.log[self.commit_length - 1] == log_entry:
-            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.node_id), Success=True)
+        if self.log[self.commitLen - 1] == log_entry:
+            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.nodeID), Success=True)
         else:
-            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.node_id), Success=False)
+            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.nodeID), Success=False)
 
-    def ServeClient(self, client_request, context):
+    def serveClientRequests(self, client_request, context):
         """Handle the client request based on the current node state"""
-        if self.state == LEADER:
+        if self.state == LEADER_STATE:
             request_parts = client_request.Request.split()
             operation = request_parts[0]
 
             if operation == "GET":
                 key = request_parts[1]
-                return self.handle_get_request(key)
+                return self.processGetRequest(key)
             elif operation == "SET":
                 key = request_parts[1]
                 value = request_parts[2]
-                return self.handle_set_request(key, value)
+                return self.processSetRequest(key, value)
         else:
-            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.current_leader), Success=False)
+            return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.currentLeader), Success=False)
 
-def clean_logs(node_id):
+def clearLogs(nodeID):
     """Clean logs, metadata, and dump text files for a node."""
-    log_dir = f"logs_node_{node_id}"
+    log_dir = f"logs_node_{nodeID}"
     if os.path.exists(log_dir):
         for filename in os.listdir(log_dir):
             os.remove(os.path.join(log_dir, filename))
-        print(f"Cleaned logs for node {node_id}")
+        print(f"Cleaned logs for node {nodeID}")
 
-def serve(node_id, node_addresses):
+def startServer(nodeID, nodeAddresses):
     """Start the Raft server for a node"""
-    node = Raft(node_id, node_addresses)
+    node = Raft(nodeID, nodeAddresses)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     raft_pb2_grpc.add_RaftServicer_to_server(node, server)
-    # server.add_insecure_port("0.0.0.0" + node_addresses[node_id][node_addresses[node_id].find(':'):])
-    server.add_insecure_port(node_addresses[node_id])
+    # server.add_insecure_port("0.0.0.0" + nodeAddresses[nodeID][nodeAddresses[nodeID].find(':'):])
+    server.add_insecure_port(nodeAddresses[nodeID])
     server.start()
-    print(f"Started {node_id} server at {node_addresses[node_id]}")
-    node.start_election_timer()
+    print(f"Started {nodeID} server at {nodeAddresses[nodeID]}")
+    node.startElectionTimeout()
     try:
         while True:
             time.sleep(1)
@@ -517,18 +514,18 @@ def serve(node_id, node_addresses):
 def main():
     """Main function to parse command line arguments and start the Raft server"""
     if len(sys.argv) < 2:
-        print("Usage: python server.py <node_id> <clear data (optional)>")
+        print("Usage: python server.py <nodeID> <clear data (optional)>")
         sys.exit(1)
-    node_id = int(sys.argv[1])
+    nodeID = int(sys.argv[1])
     clear_data = sys.argv[2] if len(sys.argv) > 2 else "false"
-    # node_addresses = {
+    # nodeAddresses = {
     #     0: "localhost:50050",
     #     1: "localhost:50051",
     #     2: "localhost:50052",
     #     3: "localhost:50053",
     #     4: "localhost:50054",
     # }
-    node_addresses = {
+    nodeAddresses = {
         0: "10.128.0.2:50050",
         1: "10.128.0.3:50051",
         2: "10.128.0.4:50052",
@@ -536,9 +533,9 @@ def main():
         4: "10.128.0.6:50054",
     }
     if clear_data.lower() == "true":
-        clean_logs(node_id)
+        clearLogs(nodeID)
 
-    serve(node_id, node_addresses)
+    startServer(nodeID, nodeAddresses)
 
 if __name__ == "__main__":
     main()
