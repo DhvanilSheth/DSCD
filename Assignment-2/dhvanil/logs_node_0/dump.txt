@@ -1,10 +1,194 @@
-[2024-03-31 22:36:16] 0 Stepping down
-[2024-03-31 22:36:16] Vote granted for Node 1 in term 1.
-[2024-03-31 22:36:16] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:17] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:18] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:19] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:20] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:21] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:22] Node 0 accepted AppendEntries RPC from 1.
-[2024-03-31 22:36:23] Node 0 accepted AppendEntries RPC from 1.
+[2024-03-31 22:42:26] Node 0 election timeout. Starting new election.
+[2024-03-31 22:42:28] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:28] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:28] Error occurred while sending RPC to Node 2.
+[2024-03-31 22:42:32] 0 Stepping down
+[2024-03-31 22:42:32] Vote granted for Node 1 in term 2.
+[2024-03-31 22:42:39] Node 0 election timeout. Starting new election.
+[2024-03-31 22:42:39] Node 0 is the leader for term 3.
+[2024-03-31 22:42:39] Waiting for Old Leader Lease to timeout.
+[2024-03-31 22:42:39] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:40] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:40] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:40] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:40] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:40] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:41] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:41] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:41] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:42] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:42] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:42] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:43] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:43] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:43] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:44] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:44] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:44] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:45] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:45] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:45] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:46] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:46] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:46] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:47] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:47] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:47] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:48] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:48] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:48] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:49] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:49] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:49] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:50] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:50] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:50] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:51] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:52] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:52] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:52] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:53] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:53] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:53] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:53] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:53] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:55] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:55] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:55] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:56] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:56] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:56] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:56] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:56] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:57] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:58] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:58] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:58] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:59] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:42:59] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:42:59] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:59] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:42:59] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:43:00] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:01] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:01] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:01] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:43:02] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:02] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:02] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:43:02] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:02] Error occurred while sending RPC to Node 3.
+[2024-03-31 22:43:03] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:04] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:04] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:05] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:05] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:05] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:06] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:07] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:07] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:08] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:08] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:08] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:09] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:10] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:10] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:11] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:11] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:11] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:12] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:13] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:13] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:14] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:14] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:14] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:15] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:16] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:16] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:17] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:17] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:17] Error occurred while sending RPC to Node 4.
+[2024-03-31 22:43:18] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:19] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:20] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:21] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:22] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:23] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:24] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:25] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:26] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:27] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:28] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:29] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:30] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:31] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:32] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:33] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:34] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:35] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:36] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:37] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:38] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:39] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:40] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:41] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:42] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:43] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:44] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:45] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:46] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:47] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:48] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:49] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:50] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:51] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:52] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:53] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:54] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:55] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:56] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:57] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:58] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:43:59] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:00] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:01] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:02] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:03] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:04] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:05] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:06] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:07] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:08] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:09] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:10] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:11] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:13] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:14] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:15] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:15] Node 0 (leader) committed the entry SET x 0 to the state machine.
+[2024-03-31 22:44:15] Node 0 (leader) committed the entry SET x 0 to the state machine.
+[2024-03-31 22:44:16] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:17] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:18] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:19] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:20] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:21] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:22] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:23] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:24] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:25] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:26] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:26] Node 0 (leader) committed the entry SET y 45 to the state machine.
+[2024-03-31 22:44:26] Node 0 (leader) committed the entry SET y 45 to the state machine.
+[2024-03-31 22:44:27] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:28] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:29] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:30] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:31] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:32] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:33] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:34] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:35] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:36] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:37] Leader 0 sending heartbeat & Renewing Lease
+[2024-03-31 22:44:38] Leader 0 sending heartbeat & Renewing Lease

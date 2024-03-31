@@ -256,7 +256,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.heartbeat_success_nodes = set()
         for nodeID, node_address in self.nodeAddresses.items():
             if nodeID != self.nodeID:
-                thread = self.replicate_log_async(nodeID)
+                thread = self.ReplicateLogAsync(nodeID)
                 threads.append(thread)
         return threads
 
@@ -281,7 +281,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self._broadcastHeartbeat()
         
     # Create, Send and Replicate Log functions for the leader to replicate logs to followers    
-    def create_log_replication(self, follower_id):
+    def CreateLogReplication(self, follower_id):
         """Create a log replication for a specific follower"""
         channel = grpc.insecure_channel(self.nodeAddresses[follower_id])
         stub = raft_pb2_grpc.RaftStub(channel)
@@ -301,32 +301,32 @@ class Raft(raft_pb2_grpc.RaftServicer):
         )
         return stub, request, prefix_length, suffix, channel
 
-    def send_log_replication(self, stub, request, follower_id, prefix_length, suffix, channel):
+    def SendLogReplication(self, stub, request, follower_id, prefix_length, suffix, channel):
         """Send a log replication to a specific follower"""
         try:
             response = stub.AppendEntries(request, timeout=1)
             if response.success:
                 self.logLengthSent[follower_id] = prefix_length + len(suffix)
                 self.logLengthAcknowledged[follower_id] = prefix_length + len(suffix)
-                self.commit_log_entries()
+                self.CommitLogEntries()
                 self.heartbeat_success_nodes.add(follower_id)
             else:
                 self.logLengthSent[follower_id] = max(0, self.logLengthSent.get(follower_id, 0) - 1)
-                self.replicate_log_async(follower_id)
+                self.ReplicateLogAsync(follower_id)
         except grpc.RpcError as e:
             self.logMessage(f"Error occurred while sending RPC to Node {follower_id}.")
         finally:
             channel.close()
 
-    def replicate_log_async(self, follower_id):
+    def ReplicateLogAsync(self, follower_id):
         """Start the replicate_log_task in a separate thread and return the thread object"""
-        stub, request, prefix_length, suffix, channel = self.create_log_replication(follower_id)
-        thread = threading.Thread(target=self.send_log_replication, args=(stub, request, follower_id, prefix_length, suffix, channel))
+        stub, request, prefix_length, suffix, channel = self.CreateLogReplication(follower_id)
+        thread = threading.Thread(target=self.SendLogReplication, args=(stub, request, follower_id, prefix_length, suffix, channel))
         thread.start()
         return thread
     
     # Commit Log Entries function to commit the log entries
-    def commit_log_entries(self):
+    def CommitLogEntries(self):
         """Commit log entries if a majority of nodes have replicated them"""
         min_acks = len(self.nodeAddresses) // 2
         ready_entries = [index for index in range(1, len(self.log) + 1)
@@ -345,7 +345,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
                 self.store_state()
 
     # Update Current Term, Log Up To Date, Grant Vote, Deny Vote functions for Request Vote RPC
-    def update_current_term_if_needed(self, vote_request):
+    def UpdateCurrentTermIfNeeded(self, vote_request):
         """Update the current term if the vote request term is greater than the current term"""
         if vote_request.term > self.currentTerm:
             self.currentTerm = vote_request.term
@@ -353,7 +353,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             self.store_state()
             self._revertToFollower()
 
-    def is_log_up_to_date(self, vote_request):
+    def LogUptoDate(self, vote_request):
         """Check if the log is up to date with the vote request log"""
         last_log_term = self.log[-1].term if self.log else 0
         log_is_up_to_date = (vote_request.last_log_term > last_log_term) or \
@@ -372,7 +372,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             old_leader_lease_timeout=remaining_lease_duration
         )
 
-    def deny_vote_to_candidate(self, vote_request):
+    def DenyVoteCandidate(self, vote_request):
         """Deny vote to the candidate if the log is not up to date or the candidate has voted for another candidate"""
         self.logMessage(f"Vote denied for Node {vote_request.candidate_id} in term {vote_request.term}.")
         return raft_pb2.RequestVoteReply(
@@ -383,18 +383,18 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def RequestVote(self, vote_request, context):
         """Handle the RequestVote RPC from a candidate"""
-        self.update_current_term_if_needed(vote_request)
+        self.UpdateCurrentTermIfNeeded(vote_request)
 
         if vote_request.term != self.currentTerm or self.votedFor not in (None, vote_request.candidate_id):
-            return self.deny_vote_to_candidate(vote_request)
+            return self.DenyVoteCandidate(vote_request)
 
-        if self.is_log_up_to_date(vote_request):
+        if self.LogUptoDate(vote_request):
             return self.grant_vote_to_candidate(vote_request)
 
-        return self.deny_vote_to_candidate(vote_request)
+        return self.DenyVoteCandidate(vote_request)
 
     # Update Current Term, Follower State, Log Consistent, Append Entries to Log functions for Append Entries RPC
-    def update_current_term_if_needed(self, append_entries_request):
+    def UpdateCurrentTermIfNeeded(self, append_entries_request):
         """Update the current term if the append entries request term is greater than the current term"""
         if append_entries_request.term > self.currentTerm:
             self.currentTerm = append_entries_request.term
@@ -402,7 +402,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
             self.store_state()
             self._revertToFollower()
 
-    def update_follower_state(self, append_entries_request):
+    def UpdateFollwerState(self, append_entries_request):
         """Update the follower state if the append entries request term is equal to the current term"""
         if append_entries_request.term == self.currentTerm:
             self.state = FOLLOWER_STATE
@@ -412,13 +412,13 @@ class Raft(raft_pb2_grpc.RaftServicer):
             self.leaseStartTime = time.time()
             self._beginElectionCountdown()
 
-    def is_log_consistent(self, append_entries_request):
+    def CheckLogConsistency(self, append_entries_request):
         """Check if the log is consistent with the append entries request"""
         log_is_consistent = (len(self.log) >= append_entries_request.prev_log_index) and \
                             (append_entries_request.prev_log_index == 0 or self.log[append_entries_request.prev_log_index - 1].term == append_entries_request.prev_log_term)
         return log_is_consistent
 
-    def append_entries_to_log(self, prev_log_index, leader_commit, entries):
+    def AppendEntriesForLog(self, prev_log_index, leader_commit, entries):
         """Append entries to the log and commit the entries if the leader commit index is greater than the current commit index"""
         if entries and len(self.log) > prev_log_index:
             index = min(len(self.log), prev_log_index + len(entries)) - 1
@@ -437,11 +437,11 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def AppendEntries(self, append_entries_request, context):
         """Handle the AppendEntries RPC from the leader"""
-        self.update_current_term_if_needed(append_entries_request)
-        self.update_follower_state(append_entries_request)
+        self.UpdateCurrentTermIfNeeded(append_entries_request)
+        self.UpdateFollwerState(append_entries_request)
 
-        if append_entries_request.term == self.currentTerm and self.is_log_consistent(append_entries_request):
-            self.append_entries_to_log(append_entries_request.prev_log_index, append_entries_request.leader_commit, append_entries_request.entries)
+        if append_entries_request.term == self.currentTerm and self.CheckLogConsistency(append_entries_request):
+            self.AppendEntriesForLog(append_entries_request.prev_log_index, append_entries_request.leader_commit, append_entries_request.entries)
             ack = append_entries_request.prev_log_index + len(append_entries_request.entries)
             self.logMessage(f"Node {self.nodeID} accepted AppendEntries RPC from {append_entries_request.leader_id}.")
             return raft_pb2.AppendEntriesReply(term=self.currentTerm, success=True, ack=ack)

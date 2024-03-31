@@ -1,1 +1,3 @@
-NO-OP 1
+NO-OP 3
+SET x 0 3
+SET y 45 3
