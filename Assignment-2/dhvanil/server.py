@@ -329,9 +329,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
     def CommitLogEntries(self):
         """Commit log entries if a majority of nodes have replicated them"""
         min_acks = len(self.nodeAddresses) // 2
-        ready_entries = [index for index in range(1, len(self.log) + 1)
-                         if len([nodeID for nodeID, logLengthAcknowledged in self.logLengthAcknowledged.items()
-                                 if logLengthAcknowledged >= index]) >= min_acks]
+        ready_entries = [index for index in range(1, len(self.log) + 1) if len([nodeID for nodeID, logLengthAcknowledged in self.logLengthAcknowledged.items() if logLengthAcknowledged >= index]) >= min_acks]
 
         if ready_entries:
             max_ready_entry = max(ready_entries)
@@ -356,8 +354,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
     def LogUptoDate(self, vote_request):
         """Check if the log is up to date with the vote request log"""
         last_log_term = self.log[-1].term if self.log else 0
-        log_is_up_to_date = (vote_request.last_log_term > last_log_term) or \
-                            (vote_request.last_log_term == last_log_term and vote_request.last_log_index >= len(self.log))
+        log_is_up_to_date = (vote_request.last_log_term > last_log_term) or (vote_request.last_log_term == last_log_term and vote_request.last_log_index >= len(self.log))
         return log_is_up_to_date
 
     def grant_vote_to_candidate(self, vote_request):
@@ -414,8 +411,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     def CheckLogConsistency(self, append_entries_request):
         """Check if the log is consistent with the append entries request"""
-        log_is_consistent = (len(self.log) >= append_entries_request.prev_log_index) and \
-                            (append_entries_request.prev_log_index == 0 or self.log[append_entries_request.prev_log_index - 1].term == append_entries_request.prev_log_term)
+        log_is_consistent = (len(self.log) >= append_entries_request.prev_log_index) and (append_entries_request.prev_log_index == 0 or self.log[append_entries_request.prev_log_index - 1].term == append_entries_request.prev_log_term)
         return log_is_consistent
 
     def AppendEntriesForLog(self, prev_log_index, leader_commit, entries):
