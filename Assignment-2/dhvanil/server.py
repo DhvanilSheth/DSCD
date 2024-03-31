@@ -20,11 +20,12 @@ LEADER_STATE = 2
 class Raft(raft_pb2_grpc.RaftServicer):
     def __init__(self, nodeID, nodeAddresses):
         self.nodeID = nodeID
-        self.nodeAddresses = nodeAddresses
         self.state = FOLLOWER_STATE
         self.currentTerm = 0
+        self.nodeAddresses = nodeAddresses
         self.votedFor = None
         self.log = []
+        self.DataStorage = {}
         self.commitLen = 0
         self.currentLeader = None
         self.receivedVotes = set()
@@ -33,10 +34,9 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.electionTimeout = None
         self.heartbeatCycle = None
         self.leasePeriod = None
-        self.prevLeaderLeaseTimeout = 0
+        self.old_leader_lease_timeout = 0
         self.leaseStartTime = 0
-        self.DataStorage = {}
-        self.loadNodeState()
+        self.loadServerState()
         self.initLogDirectory()
 
     # Create and write functions to dump info
@@ -57,7 +57,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.dump_file.flush()
 
     # Store and Load state functions to persist the logs and metadata
-    def loadNodeState(self):
+    def loadServerState(self):
         """Load the state from disk to recover the logs and metadata"""
         log_file_path = f"logs_node_{self.nodeID}/logs.txt"
         metadata_file_path = f"logs_node_{self.nodeID}/metadata.txt"
@@ -82,7 +82,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         except FileNotFoundError:
             pass
 
-    def saveNodeState(self):
+    def store_state(self):
         """Save the current state on disk to persist the logs and metadata"""
         log_file_path = f"logs_node_{self.nodeID}/logs.txt"
         metadata_file_path = f"logs_node_{self.nodeID}/metadata.txt"
@@ -103,48 +103,48 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
     # Start Timer functions for election, heartbeat and lease
     # Threading.Timer is used to start a timer that will run a function after a specified number of seconds
-    def startElectionTimeout(self):
+    def _beginElectionCountdown(self):
         """Start the election timer with a random duration"""
         election_timeout = random.uniform(ELECTION_TIMEOUT_MIN, ELECTION_TIMEOUT_MAX)
-        self.electionTimeout = threading.Timer(election_timeout, self.initiateElection)
+        self.electionTimeout = threading.Timer(election_timeout, self._triggerElection)
         self.electionTimeout.start()
 
-    def initHeartbeatTimer(self):
+    def _initiateHeartbeatCycle(self):
         """Start the heartbeat timer with a fixed interval"""
-        self.heartbeatCycle = threading.Timer(HEARTBEAT_INTERVAL_SECONDS, self.broadcastHeartbeats)
+        self.heartbeatCycle = threading.Timer(HEARTBEAT_INTERVAL_SECONDS, self._issueHeartbeats)
         self.heartbeatCycle.start()
 
-    def beginLeasePeriod(self):
+    def _startLeaseCountdown(self):
         """Start the lease timer with a fixed duration"""
         self.leaseStartTime = time.time()
-        self.leasePeriod = threading.Timer(LEASE_DURATION_SECONDS, self.leaseTimeout)
+        self.leasePeriod = threading.Timer(LEASE_DURATION_SECONDS, self.lease_timeout)
         self.leasePeriod.start()
 
     # Cancel Timer functions for election, heartbeat and lease
-    def stopElectionTimeout(self):
+    def _stopElectionTimer(self):
         """Cancel the election timer if it is active"""
         if self.electionTimeout:
             self.electionTimeout.cancel()
 
-    def haltHeartbeatCycle(self):
+    def _haltHeartbeatTimer(self):
         """Cancel the heartbeat timer if it is active"""
         if self.heartbeatCycle:
             self.heartbeatCycle.cancel()
 
-    def endLeasePeriod(self):
+    def _terminateLeaseTimer(self):
         """Cancel the lease timer if it is active"""
         if self.leasePeriod:
             self.leasePeriod.cancel()
 
     # Start and Check Election functions for the election process
-    def verifyElectionOutcome(self):
+    def _evaluateElectionOutcome(self):
         """Check the result of the election after the election timer expires"""
         if len(self.receivedVotes) < (len(self.nodeAddresses) // 2) + 1:
-            self.startElectionTimeout()
+            self._beginElectionCountdown()
         else:
-            self.assumeLeadership()
+            self._ascendToLeader()
 
-    def initiateElection(self):
+    def _triggerElection(self):
         """Start the election process by incrementing the term and requesting votes from other nodes"""
         self.logMessage(f"Node {self.nodeID} election timeout. Starting new election.")
         self.state = CANDIDATE_STATE
@@ -155,21 +155,21 @@ class Raft(raft_pb2_grpc.RaftServicer):
         last_term = 0
         if self.log:
             last_term = self.log[-1].term
-        self.saveNodeState()
+        self.store_state()
 
         threads = []
         for nodeID, _ in self.nodeAddresses.items():
             if nodeID == self.nodeID:
                 continue
             else:
-                thread = self.asyncVoteRequest(nodeID, last_term)
+                thread = self._requestVoteAsync(nodeID, last_term)
                 threads.append(thread)
 
-        timer = threading.Timer(0.1, self.verifyElectionOutcome)
+        timer = threading.Timer(0.1, self._evaluateElectionOutcome)
         timer.start()
        
     # Create, Send and Request Vote functions for the election process   
-    def prepareVoteRequest(self, nodeID, last_term):
+    def _generateVoteRequest(self, nodeID, last_term):
         """Create a vote request for a specific node"""
         channel = grpc.insecure_channel(self.nodeAddresses[nodeID])
         stub = raft_pb2_grpc.RaftStub(channel)
@@ -182,7 +182,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         )
         return stub, request, channel
 
-    def sendVoteRequest(self, stub, request, nodeID, channel):
+    def _dispatchVoteRequest(self, stub, request, nodeID, channel):
         """Send a vote request to a specific node"""
         try:
             response = stub.RequestVote(request, timeout=1)
@@ -190,10 +190,10 @@ class Raft(raft_pb2_grpc.RaftServicer):
             if response.vote_granted:
                 self.receivedVotes.add(nodeID)
 
-                remaining_lease_duration = self.prevLeaderLeaseTimeout - (time.time() - self.leaseStartTime)
+                remaining_lease_duration = self.old_leader_lease_timeout - (time.time() - self.leaseStartTime)
                 if remaining_lease_duration < 0:
                     remaining_lease_duration = 0
-                self.prevLeaderLeaseTimeout = max(remaining_lease_duration, response.prevLeaderLeaseTimeout)
+                self.old_leader_lease_timeout = max(remaining_lease_duration, response.old_leader_lease_timeout)
                     
         except grpc.RpcError as e:
             # Handle any errors that occur during the RPC
@@ -201,15 +201,15 @@ class Raft(raft_pb2_grpc.RaftServicer):
         finally:
             channel.close()
 
-    def asyncVoteRequest(self, nodeID, last_term):
+    def _requestVoteAsync(self, nodeID, last_term):
         """Start the request_vote_task in a separate thread and return the thread object"""
-        stub, request, channel = self.prepareVoteRequest(nodeID, last_term)
-        thread = threading.Thread(target=self.sendVoteRequest, args=(stub, request, nodeID, channel))
+        stub, request, channel = self._generateVoteRequest(nodeID, last_term)
+        thread = threading.Thread(target=self._dispatchVoteRequest, args=(stub, request, nodeID, channel))
         thread.start()
         return thread
 
     # Become Leader function to handle the leader election process
-    def assumeLeadership(self):
+    def _ascendToLeader(self):
         """Handle the leader election process after receiving votes from a majority of nodes"""
         self.logMessage(f"Node {self.nodeID} is the leader for term {self.currentTerm}.")
         self.state = LEADER_STATE
@@ -217,21 +217,21 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.receivedVotes = set()
         self.logLengthSent = {nodeID: len(self.log) for nodeID in self.nodeAddresses}
         self.logLengthAcknowledged = {nodeID: 0 for nodeID in self.nodeAddresses}
-        self.stopElectionTimeout()
+        self._stopElectionTimer()
 
         self.logMessage("Waiting for Old Leader Lease to timeout.")
-        time.sleep(self.prevLeaderLeaseTimeout)
+        time.sleep(self.old_leader_lease_timeout)
 
-        self.beginLeasePeriod()
-        self.insertNoOp()
-        self.broadcastHeartbeats()
+        self._startLeaseCountdown()
+        self._logNoOpEntry()
+        self._issueHeartbeats()
 
-    def leaseTimeout(self):
+    def lease_timeout(self):
         """Handle the case when the leader lease expires without renewing the lease"""
         self.logMessage(f"Leader {self.nodeID} lease renewal failed. Stepping Down.")
-        self.revertToFollower()
+        self._revertToFollower()
 
-    def revertToFollower(self):
+    def _revertToFollower(self):
         """Step down from the leader role and become a follower"""
         self.logMessage(f"{self.nodeID} Stepping down")
         self.state = FOLLOWER_STATE
@@ -239,49 +239,49 @@ class Raft(raft_pb2_grpc.RaftServicer):
         self.receivedVotes = set()
         self.logLengthSent = {}
         self.logLengthAcknowledged = {}
-        self.haltHeartbeatCycle()
-        self.endLeasePeriod()
-        self.stopElectionTimeout()
-        self.startElectionTimeout()
+        self._haltHeartbeatTimer()
+        self._terminateLeaseTimer()
+        self._stopElectionTimer()
+        self._beginElectionCountdown()
 
-    def insertNoOp(self):
+    def _logNoOpEntry(self):
         """Append a NO-OP entry to the log to maintain the leader lease"""
         self.log.append(raft_pb2.LogEntry(operation="NO-OP", term=self.currentTerm))
-        self.saveNodeState()
+        self.store_state()
 
     # Create, Send and Heartbeat functions for the leader to send heartbeats to followers
-    def generateHeartbeats(self):
+    def _generateHeartbeatSignal(self):
         """Create a heartbeat for all the followers"""
         threads = []
         self.heartbeat_success_nodes = set()
         for nodeID, node_address in self.nodeAddresses.items():
             if nodeID != self.nodeID:
-                thread = self.asyncLogReplication(nodeID)
+                thread = self.replicate_log_async(nodeID)
                 threads.append(thread)
         return threads
 
-    def broadcastHeartbeat(self):
+    def _broadcastHeartbeat(self):
         """Send the heartbeat to all the followers and check the lease renewal"""
         def check_lease_renewal():
             if len(self.heartbeat_success_nodes) < (len(self.nodeAddresses) // 2):
                 self.logMessage(f"Leader {self.nodeID} failed to renew lease. Stepping down.")
-                self.revertToFollower()
+                self._revertToFollower()
 
         remaining_lease_time = self.leasePeriod.interval - (time.time() - self.leaseStartTime)
         timer = threading.Timer(remaining_lease_time, check_lease_renewal)
         timer.start()
-        self.initHeartbeatTimer()
+        self._initiateHeartbeatCycle()
 
-    def broadcastHeartbeats(self):
-        """Using the generateHeartbeats and broadcastHeartbeat functions"""
+    def _issueHeartbeats(self):
+        """Using the _generateHeartbeatSignal and _broadcastHeartbeat functions"""
         self.logMessage(f"Leader {self.nodeID} sending heartbeat & Renewing Lease")
         self.leasePeriod.cancel()
-        self.beginLeasePeriod()
-        self.generateHeartbeats()
-        self.broadcastHeartbeat()
+        self._startLeaseCountdown()
+        self._generateHeartbeatSignal()
+        self._broadcastHeartbeat()
         
     # Create, Send and Replicate Log functions for the leader to replicate logs to followers    
-    def prepareLogReplication(self, follower_id):
+    def create_log_replication(self, follower_id):
         """Create a log replication for a specific follower"""
         channel = grpc.insecure_channel(self.nodeAddresses[follower_id])
         stub = raft_pb2_grpc.RaftStub(channel)
@@ -301,32 +301,32 @@ class Raft(raft_pb2_grpc.RaftServicer):
         )
         return stub, request, prefix_length, suffix, channel
 
-    def executeLogReplication(self, stub, request, follower_id, prefix_length, suffix, channel):
+    def send_log_replication(self, stub, request, follower_id, prefix_length, suffix, channel):
         """Send a log replication to a specific follower"""
         try:
             response = stub.AppendEntries(request, timeout=1)
             if response.success:
                 self.logLengthSent[follower_id] = prefix_length + len(suffix)
                 self.logLengthAcknowledged[follower_id] = prefix_length + len(suffix)
-                self.commitLogEntries()
+                self.commit_log_entries()
                 self.heartbeat_success_nodes.add(follower_id)
             else:
                 self.logLengthSent[follower_id] = max(0, self.logLengthSent.get(follower_id, 0) - 1)
-                self.asyncLogReplication(follower_id)
+                self.replicate_log_async(follower_id)
         except grpc.RpcError as e:
             self.logMessage(f"Error occurred while sending RPC to Node {follower_id}.")
         finally:
             channel.close()
 
-    def asyncLogReplication(self, follower_id):
+    def replicate_log_async(self, follower_id):
         """Start the replicate_log_task in a separate thread and return the thread object"""
-        stub, request, prefix_length, suffix, channel = self.prepareLogReplication(follower_id)
-        thread = threading.Thread(target=self.executeLogReplication, args=(stub, request, follower_id, prefix_length, suffix, channel))
+        stub, request, prefix_length, suffix, channel = self.create_log_replication(follower_id)
+        thread = threading.Thread(target=self.send_log_replication, args=(stub, request, follower_id, prefix_length, suffix, channel))
         thread.start()
         return thread
     
     # Commit Log Entries function to commit the log entries
-    def commitLogEntries(self):
+    def commit_log_entries(self):
         """Commit log entries if a majority of nodes have replicated them"""
         min_acks = len(self.nodeAddresses) // 2
         ready_entries = [index for index in range(1, len(self.log) + 1)
@@ -342,7 +342,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
                         self.DataStorage[entry.key] = entry.value
                         self.logMessage(f"Node {self.nodeID} (leader) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
                 self.commitLen = max_ready_entry
-                self.saveNodeState()
+                self.store_state()
 
     # Update Current Term, Log Up To Date, Grant Vote, Deny Vote functions for Request Vote RPC
     def update_current_term_if_needed(self, vote_request):
@@ -350,8 +350,8 @@ class Raft(raft_pb2_grpc.RaftServicer):
         if vote_request.term > self.currentTerm:
             self.currentTerm = vote_request.term
             self.votedFor = None
-            self.saveNodeState()
-            self.revertToFollower()
+            self.store_state()
+            self._revertToFollower()
 
     def is_log_up_to_date(self, vote_request):
         """Check if the log is up to date with the vote request log"""
@@ -363,13 +363,13 @@ class Raft(raft_pb2_grpc.RaftServicer):
     def grant_vote_to_candidate(self, vote_request):
         """Grant vote to the candidate if the log is up to date and the candidate has not voted for another candidate"""
         self.votedFor = vote_request.candidate_id
-        self.saveNodeState()
+        self.store_state()
         self.logMessage(f"Vote granted for Node {vote_request.candidate_id} in term {vote_request.term}.")
-        remaining_lease_duration = max(0, self.prevLeaderLeaseTimeout - (time.time() - self.leaseStartTime))
+        remaining_lease_duration = max(0, self.old_leader_lease_timeout - (time.time() - self.leaseStartTime))
         return raft_pb2.RequestVoteReply(
             term=self.currentTerm,
             vote_granted=True,
-            prevLeaderLeaseTimeout=remaining_lease_duration
+            old_leader_lease_timeout=remaining_lease_duration
         )
 
     def deny_vote_to_candidate(self, vote_request):
@@ -378,7 +378,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         return raft_pb2.RequestVoteReply(
             term=self.currentTerm,
             vote_granted=False,
-            prevLeaderLeaseTimeout=self.prevLeaderLeaseTimeout
+            old_leader_lease_timeout=self.old_leader_lease_timeout
         )
 
     def RequestVote(self, vote_request, context):
@@ -399,18 +399,18 @@ class Raft(raft_pb2_grpc.RaftServicer):
         if append_entries_request.term > self.currentTerm:
             self.currentTerm = append_entries_request.term
             self.votedFor = None
-            self.saveNodeState()
-            self.revertToFollower()
+            self.store_state()
+            self._revertToFollower()
 
     def update_follower_state(self, append_entries_request):
         """Update the follower state if the append entries request term is equal to the current term"""
         if append_entries_request.term == self.currentTerm:
             self.state = FOLLOWER_STATE
             self.currentLeader = append_entries_request.leader_id
-            self.stopElectionTimeout()
-            self.prevLeaderLeaseTimeout = append_entries_request.lease_duration
+            self._stopElectionTimer()
+            self.old_leader_lease_timeout = append_entries_request.lease_duration
             self.leaseStartTime = time.time()
-            self.startElectionTimeout()
+            self._beginElectionCountdown()
 
     def is_log_consistent(self, append_entries_request):
         """Check if the log is consistent with the append entries request"""
@@ -433,7 +433,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
                     self.DataStorage[entry.key] = entry.value
                     self.logMessage(f"Node {self.nodeID} (follower) committed the entry {entry.operation} {entry.key} {entry.value} to the state machine.")
             self.commitLen = leader_commit
-        self.saveNodeState()
+        self.store_state()
 
     def AppendEntries(self, append_entries_request, context):
         """Handle the AppendEntries RPC from the leader"""
@@ -450,16 +450,16 @@ class Raft(raft_pb2_grpc.RaftServicer):
             return raft_pb2.AppendEntriesReply(term=self.currentTerm, success=False, ack=0)
 
     # Handle Get and Set Request functions for the client requests
-    def processGetRequest(self, key):
+    def handle_get_request(self, key):
         """Handle the GET request from the client"""
         value = self.DataStorage.get(key, "")
         return raft_pb2.ServeClientReply(Data=value, LeaderID=str(self.nodeID), Success=True)
 
-    def processSetRequest(self, key, value):
+    def handle_set_request(self, key, value):
         """Handle the SET request from the client"""
         log_entry = raft_pb2.LogEntry(operation="SET", key=key, value=value, term=self.currentTerm)
         self.log.append(log_entry)
-        self.saveNodeState()
+        self.store_state()
 
         # Wait for the entry to be committed
         while self.commitLen < len(self.log):
@@ -471,7 +471,7 @@ class Raft(raft_pb2_grpc.RaftServicer):
         else:
             return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.nodeID), Success=False)
 
-    def serveClientRequests(self, client_request, context):
+    def ServeClient(self, client_request, context):
         """Handle the client request based on the current node state"""
         if self.state == LEADER_STATE:
             request_parts = client_request.Request.split()
@@ -479,15 +479,15 @@ class Raft(raft_pb2_grpc.RaftServicer):
 
             if operation == "GET":
                 key = request_parts[1]
-                return self.processGetRequest(key)
+                return self.handle_get_request(key)
             elif operation == "SET":
                 key = request_parts[1]
                 value = request_parts[2]
-                return self.processSetRequest(key, value)
+                return self.handle_set_request(key, value)
         else:
             return raft_pb2.ServeClientReply(Data="", LeaderID=str(self.currentLeader), Success=False)
 
-def clearLogs(nodeID):
+def clearNodeLogs(nodeID):
     """Clean logs, metadata, and dump text files for a node."""
     log_dir = f"logs_node_{nodeID}"
     if os.path.exists(log_dir):
@@ -495,7 +495,7 @@ def clearLogs(nodeID):
             os.remove(os.path.join(log_dir, filename))
         print(f"Cleaned logs for node {nodeID}")
 
-def startServer(nodeID, nodeAddresses):
+def launchNodeServer(nodeID, nodeAddresses):
     """Start the Raft server for a node"""
     node = Raft(nodeID, nodeAddresses)
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
@@ -504,7 +504,7 @@ def startServer(nodeID, nodeAddresses):
     server.add_insecure_port(nodeAddresses[nodeID])
     server.start()
     print(f"Started {nodeID} server at {nodeAddresses[nodeID]}")
-    node.startElectionTimeout()
+    node._beginElectionCountdown()
     try:
         while True:
             time.sleep(1)
@@ -518,24 +518,24 @@ def main():
         sys.exit(1)
     nodeID = int(sys.argv[1])
     clear_data = sys.argv[2] if len(sys.argv) > 2 else "false"
-    # nodeAddresses = {
-    #     0: "localhost:50050",
-    #     1: "localhost:50051",
-    #     2: "localhost:50052",
-    #     3: "localhost:50053",
-    #     4: "localhost:50054",
-    # }
     nodeAddresses = {
-        0: "10.128.0.2:50050",
-        1: "10.128.0.3:50051",
-        2: "10.128.0.4:50052",
-        3: "10.128.0.5:50053",
-        4: "10.128.0.6:50054",
+        0: "localhost:50050",
+        1: "localhost:50051",
+        2: "localhost:50052",
+        3: "localhost:50053",
+        4: "localhost:50054",
     }
+    # nodeAddresses = {
+    #     0: "10.128.0.2:50050",
+    #     1: "10.128.0.3:50051",
+    #     2: "10.128.0.4:50052",
+    #     3: "10.128.0.5:50053",
+    #     4: "10.128.0.6:50054",
+    # }
     if clear_data.lower() == "true":
-        clearLogs(nodeID)
+        clearNodeLogs(nodeID)
 
-    startServer(nodeID, nodeAddresses)
+    launchNodeServer(nodeID, nodeAddresses)
 
 if __name__ == "__main__":
     main()
