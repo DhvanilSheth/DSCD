@@ -95,6 +95,8 @@ class Raft(raft_pb2_grpc.RaftServicer):
                     log_file.write(f"NO-OP {entry.term}\n")
                 elif entry.operation == "SET":
                     log_file.write(f"SET {entry.key} {entry.value} {entry.term}\n")
+                elif entry.operation == "GET":
+                    log_file.write(f"GET {entry.key} {entry.value} {entry.term}\n")
 
         with open(metadata_file_path, "w") as metadata_file:
             metadata_file.write(f"{self.commitLen}\n")
@@ -449,8 +451,12 @@ class Raft(raft_pb2_grpc.RaftServicer):
     def handle_get_request(self, key):
         """Handle the GET request from the client"""
         value = self.DataStorage.get(key, "")
+        self.logMessage(f"Node {self.nodeID} received GET request for key {key}. Returned value: {value}")
+        log_entry = raft_pb2.LogEntry(operation="GET", key=key, value=value, term=self.currentTerm)
+        self.log.append(log_entry)
+        self.store_state()
         return raft_pb2.ServeClientReply(Data=value, LeaderID=str(self.nodeID), Success=True)
-
+    
     def handle_set_request(self, key, value):
         """Handle the SET request from the client"""
         log_entry = raft_pb2.LogEntry(operation="SET", key=key, value=value, term=self.currentTerm)

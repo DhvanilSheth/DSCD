@@ -1,1 +1,13 @@
+NO-OP 1
+SET apples 5 1
+SET oranges 3 1
+GET apples 5 1
+GET apples 5 1
+SET oranges 3 1
+GET oranges 3 1
 NO-OP 2
+GET __leader__  2
+GET apples 5 2
+GET __leader__  2
+SET apples 15 2
+GET apples 15 2
