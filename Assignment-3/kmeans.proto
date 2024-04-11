@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package kmeans;
+
+// Request and Response for Mapper
+message MapperRequest {
+  int32 mapper_id = 1;
+  string input_data = 2;  // Contains information about the input split
+  repeated Point centroids = 3;  // Centroids from the previous iteration
+}
+
+message MapperResponse {
+  int32 mapper_id = 1;
+  bool success = 2;
+  string message = 3; // Additional message to return, e.g., error message
+}
+
+// Request and Response for Reducer
+message ReducerRequest {
+  int32 reducer_id = 1;
+  repeated int32 keys = 2; // Contains the keys that this reducer is responsible for
+}
+
+message ReducerResponse {
+  int32 reducer_id = 1;
+  bool success = 2;
+  string message = 3; // Additional message to return, e.g., error message
+}
+
+// The point structure representing a data point or centroid.
+message Point {
+  int32 id = 1;  // Centroid ID or some unique identifier for data points
+  repeated float coordinates = 2; // Coordinates of the point.
+}
+
+service KMeansService {
+  rpc MapTask(MapperRequest) returns (MapperResponse) {}
+  rpc ReduceTask(ReducerRequest) returns (ReducerResponse) {}
+}
+
+
+// python -m grpc_tools.protoc -I. --python_out=. --grpc_python_out=. kmeans.proto
