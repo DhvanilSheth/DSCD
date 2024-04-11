@@ -1,6 +1,8 @@
 import grpc
 from concurrent import futures
 import time
+import subprocess
+import os
 import random
 import kmeans_pb2
 import kmeans_pb2_grpc
@@ -9,72 +11,90 @@ class MasterServer:
     def __init__(self, mappers, reducers, centroids, iterations, input_file):
         self.num_mappers = mappers
         self.num_reducers = reducers
-        self.num_centroids = centroids
+        self.centroids = self.initialize_centroids(centroids, input_file)
         self.max_iterations = iterations
-        self.input_file = input_file
+        self.input_file = self.load_input_file(input_file)
+
+    def initialize_centroids(self, num_centroids, input_file):
+        # Load the input data and select `num_centroids` random points
+        data = self.load_input_file(input_file)
+        centroids = random.sample(data, num_centroids)
+        # Write the initial centroids to a file
+        with open("centroids.txt", "w") as file:
+            for centroid in centroids:
+                file.write(f"{centroid}\n")
+        return centroids
+
+    def load_input_file(self, input_file):
+        # Load the input data from a file
+        with open(input_file, "r") as file:
+            data = [line.strip() for line in file]
+        return data
 
     def start_map_reduce(self):
-        # Method to start the MapReduce process for K-Means clustering.
-        # This includes the iterative process, invoking mappers and reducers,
-        # handling failures, and updating centroids.
-
-        # Pseudocode for starting the iterative process:
         for iteration in range(self.max_iterations):
             print(f"Starting iteration {iteration+1}")
 
-            # Perform the mapping tasks
             self.start_mapping()
 
-            # Perform the reducing tasks
             self.start_reducing()
 
-            # Check for convergence or update centroids
-            # If converged, break the loop
+            self.update_centroids()
 
-            # Logging the centroids and iteration info
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
 
     def start_mapping(self):
-        chunk_size = len(self.input_file) // self.num_mappers
-        remaining_data = len(self.input_file) % self.num_mappers
-
         for mapper_id in range(self.num_mappers):
-            start_index = mapper_id * chunk_size
-            end_index = start_index + chunk_size
-
-            if mapper_id == self.num_mappers - 1:
-                end_index += remaining_data
-
-            data_chunk = self.input_file[start_index:end_index]
-
-            with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                centroids = [kmeans_pb2.Point(id=i, coordinates=c) for i, c in enumerate(self.centroids)]
-                response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id=mapper_id, input_data=data_chunk, centroids=centroids))
-                print(f"Mapper {mapper_id} response: {response.success}")
+            command = ["python", "mapper.py", str(mapper_id), str(self.num_centroids)]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                print(f"Mapper {mapper_id} failed with error: {stderr.decode()}")
+            else:
+                print(f"Mapper {mapper_id} completed successfully")
 
     def start_reducing(self):
         for reducer_id in range(self.num_reducers):
-            keys = []  # Collect keys from mappers
-            for mapper_id in range(self.num_mappers):
-                with open(f"Mappers/M{mapper_id}/partition_{reducer_id}.txt", "r") as file:
-                    keys.extend(map(int, file.read().splitlines()))
+            command = ["python", "reducer.py", str(reducer_id)]
+            process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                print(f"Reducer {reducer_id} failed with error: {stderr.decode()}")
+            else:
+                print(f"Reducer {reducer_id} completed successfully")
 
-            with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id=reducer_id, keys=keys))
-                print(f"Reducer {reducer_id} response: {response.success}")
+    def update_centroids(self):
+        # Load the output of the reducers and update the centroids
+        centroids = []
+        for reducer_id in range(self.num_reducers):
+            with open(f"Reducers/R{reducer_id}.txt", "r") as file:
+                centroids.extend([line.strip() for line in file])
+        self.centroids = centroids
+        # Write the updated centroids to a file
+        with open("centroids.txt", "w") as file:
+            for centroid in centroids:
+                file.write(f"{centroid}\n")
 
     def check_mapper_failure(self, mapper_id):
-        # Implemention of fault tolerance by checking if a mapper has failed.
-        # If so, restart the mapper task.
-        pass
+        if not os.path.exists(f"Mappers/M{mapper_id}/keys.txt"):
+            print(f"Mapper {mapper_id} has failed. Restarting...")
+            self.start_mapping_for_mapper(mapper_id)
 
     def check_reducer_failure(self, reducer_id):
-        # Similar to check_mapper_failure, but for reducers.
+        if not os.path.exists(f"Reducers/R{reducer_id}.txt"):
+            print(f"Reducer {reducer_id} has failed. Restarting...")
+            self.start_reducing_for_reducer(reducer_id)
+
+    def start_mapping_for_mapper(self, mapper_id):
+        # Start the mapping task for a specific mapper
+        # This is similar to the start_mapping method, but only for one mapper
         pass
 
-# Function to serve the Master server using gRPC
+    def start_reducing_for_reducer(self, reducer_id):
+        # Start the reducing task for a specific reducer
+        # This is similar to the start_reducing method, but only for one reducer
+        pass
+
 def serve():
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     kmeans_pb2_grpc.add_MasterServicer_to_server(MasterServer(), server)
