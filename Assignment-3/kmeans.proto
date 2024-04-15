@@ -5,8 +5,9 @@ package kmeans;
 // Request and Response for Mapper
 message MapperRequest {
   int32 mapper_id = 1;
-  string input_data = 2;  // Contains information about the input split
-  repeated Point centroids = 3;  // Centroids from the previous iteration
+  int32 start_idx = 2;  // starting index of the data points in the input data for the mapper
+  int32 end_idx = 3;  // ending index of the data points in the input data for the mapper
+  repeated Point centroids = 4;  // Centroids from the previous iteration
 }
 
 message MapperResponse {
