@@ -21,6 +21,9 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.reducer_processes = []
         self.convergence = False
 
+        self.log_file = open('Data/dump.txt', 'a')
+        sys.stdout = self.log_file
+
     def initialize_centroids(self, num_centroids, data):
         # random.seed(0)
         centroids = random.sample(data, num_centroids)
@@ -51,11 +54,11 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             print(f"Centroids updated")
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
+            self.visualize(centroids_flag=True, iteration=iteration+1)
 
             if self.convergence:
                 print(f"Converged after {iteration+1} iterations")
                 print(f"Final centroids: {self.centroids}")
-                self.visualize(centroids_flag=True)
                 break
 
     def start_mapping(self):
@@ -141,7 +144,9 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             process.wait()
         print("All processes terminated")
 
-    def visualize(self, centroids_flag = False):
+        self.log_file.close()
+
+    def visualize(self, centroids_flag = False, iteration = 0):
         import matplotlib.pyplot as plt
         data = self.load_input_file(self.input_file)
         data = list(map(list, zip(*data)))
@@ -150,6 +155,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             centroids = self.centroids
             centroids = list(map(list, zip(*centroids)))
             plt.scatter(centroids[0], centroids[1], color='red')
+        plt.title(f'KMeans Clustering - Iteration {iteration}')
         plt.show()
 
 def serve(master, timeout=3600):
@@ -160,7 +166,7 @@ def serve(master, timeout=3600):
     server.wait_for_termination(timeout=timeout)
 
 if __name__ == '__main__':
-    if len(sys.argv) != 5:
+    if len(sys.argv) != 6:
         print("Usage: master.py <num_mappers> <num_reducers> <num_centroids> <max_iterations> <input_file>")
         sys.exit(1)
 
@@ -168,7 +174,7 @@ if __name__ == '__main__':
     num_reducers = int(sys.argv[2])
     num_centroids = int(sys.argv[3])
     max_iterations = int(sys.argv[4])
-    input_file = "Data/Input/points2.txt"
+    input_file = sys.argv[5] #EG : Data/Input/points2.txt
 
     master = Master(num_mappers, num_reducers, num_centroids, max_iterations, input_file)
     master.start_map_reduce()
