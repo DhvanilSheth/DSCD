@@ -31,7 +31,8 @@ message ReducerResponse {
 // The point structure representing a data point or centroid.
 message Point {
   int32 id = 1;  // Centroid ID or some unique identifier for data points
-  repeated float coordinates = 2; // Coordinates of the point.
+  repeated float x_coordinate = 2;  // x-coordinates of the data points
+  repeated float y_coordinate = 3;  // y-coordinates of the data points
 }
 
 service KMeansService {

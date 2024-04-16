@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ckmeans.proto\x12\x06kmeans\"h\n\rMapperRequest\x12\x11\n\tmapper_id\x18\x01 \x01(\x05\x12\x11\n\tstart_idx\x18\x02 \x01(\x05\x12\x0f\n\x07\x65nd_idx\x18\x03 \x01(\x05\x12 \n\tcentroids\x18\x04 \x03(\x0b\x32\r.kmeans.Point\"E\n\x0eMapperResponse\x12\x11\n\tmapper_id\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"2\n\x0eReducerRequest\x12\x12\n\nreducer_id\x18\x01 \x01(\x05\x12\x0c\n\x04keys\x18\x02 \x03(\x05\"G\n\x0fReducerResponse\x12\x12\n\nreducer_id\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"(\n\x05Point\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x13\n\x0b\x63oordinates\x18\x02 \x03(\x02\x32\x8c\x01\n\rKMeansService\x12:\n\x07MapTask\x12\x15.kmeans.MapperRequest\x1a\x16.kmeans.MapperResponse\"\x00\x12?\n\nReduceTask\x12\x16.kmeans.ReducerRequest\x1a\x17.kmeans.ReducerResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0ckmeans.proto\x12\x06kmeans\"h\n\rMapperRequest\x12\x11\n\tmapper_id\x18\x01 \x01(\x05\x12\x11\n\tstart_idx\x18\x02 \x01(\x05\x12\x0f\n\x07\x65nd_idx\x18\x03 \x01(\x05\x12 \n\tcentroids\x18\x04 \x03(\x0b\x32\r.kmeans.Point\"E\n\x0eMapperResponse\x12\x11\n\tmapper_id\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"2\n\x0eReducerRequest\x12\x12\n\nreducer_id\x18\x01 \x01(\x05\x12\x0c\n\x04keys\x18\x02 \x03(\x05\"G\n\x0fReducerResponse\x12\x12\n\nreducer_id\x18\x01 \x01(\x05\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\"?\n\x05Point\x12\n\n\x02id\x18\x01 \x01(\x05\x12\x14\n\x0cx_coordinate\x18\x02 \x03(\x02\x12\x14\n\x0cy_coordinate\x18\x03 \x03(\x02\x32\x8c\x01\n\rKMeansService\x12:\n\x07MapTask\x12\x15.kmeans.MapperRequest\x1a\x16.kmeans.MapperResponse\"\x00\x12?\n\nReduceTask\x12\x16.kmeans.ReducerRequest\x1a\x17.kmeans.ReducerResponse\"\x00\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -30,7 +30,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _globals['_REDUCERRESPONSE']._serialized_start=253
   _globals['_REDUCERRESPONSE']._serialized_end=324
   _globals['_POINT']._serialized_start=326
-  _globals['_POINT']._serialized_end=366
-  _globals['_KMEANSSERVICE']._serialized_start=369
-  _globals['_KMEANSSERVICE']._serialized_end=509
+  _globals['_POINT']._serialized_end=389
+  _globals['_KMEANSSERVICE']._serialized_start=392
+  _globals['_KMEANSSERVICE']._serialized_end=532
 # @@protoc_insertion_point(module_scope)

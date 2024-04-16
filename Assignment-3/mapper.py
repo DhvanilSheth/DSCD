@@ -2,7 +2,6 @@ import grpc
 from concurrent import futures
 import kmeans_pb2
 import kmeans_pb2_grpc
-import json
 import os
 import sys
 
@@ -15,12 +14,16 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
         mapper_id = request.mapper_id
         start_idx = request.start_idx
         end_idx = request.end_idx
-        centroids = self._parse_centroids(request.centroids)
 
+        centroids = self._parse_centroids(request.centroids)
+        print(f"Mapper {mapper_id}, received Centroids : {centroids} ")
         data_points = self._read_data_points(start_idx, end_idx)
+        print(f"Mapper {mapper_id}, Data Points : {data_points} ")
         mapped_data = self._map_data(data_points, centroids)
+        print(f"Mapper {mapper_id}, Mapped Data : {mapped_data} ")
         self._write_to_file(mapped_data, mapper_id)
         partitions = self._partition_data(mapped_data)
+        print(f"Mapper {mapper_id}, Partitions : {partitions} ")
         self._write_partitions(partitions, mapper_id)
 
         return kmeans_pb2.MapperResponse(
@@ -30,20 +33,21 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
         )
 
     def _parse_centroids(self, centroids):
-        return [point.coordinates for point in centroids]
+        parsed_centroids = [[point.x_coordinate[0], point.y_coordinate[0]] for point in centroids]
+        print(f"Parsed Centroids : {parsed_centroids} ")
+        return parsed_centroids
 
     def _read_data_points(self, start_idx, end_idx):
         with open('Data/Input/points.txt', 'r') as f:
             lines = f.readlines()[start_idx:end_idx]
-        return [list(map(float, line.strip().split(","))) for line in lines]
+        data_points = [list(map(float, line.strip().split(","))) for line in lines]
+        return data_points
 
     def _map_data(self, data_points, centroids):
-        mapped_data = {}
+        mapped_data = []
         for point in data_points:
             nearest_centroid_index = self._find_nearest_centroid(point, centroids)
-            if nearest_centroid_index not in mapped_data:
-                mapped_data[nearest_centroid_index] = []
-            mapped_data[nearest_centroid_index].append(point)
+            mapped_data.append((nearest_centroid_index, point))
         return mapped_data
 
     def _find_nearest_centroid(self, point, centroids):
@@ -54,31 +58,37 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
             if distance < min_distance:
                 min_distance = distance
                 nearest_centroid_index = i
+        print(f"Nearest Centroid for point {point} : {nearest_centroid_index} ")
         return nearest_centroid_index
 
     def _calculate_distance(self, point, centroid):
-        return sum((a - b) ** 2 for a, b in zip(point, centroid)) ** 0.5
+        distance = sum((a - b) ** 2 for a, b in zip(point, centroid)) ** 0.5
+        print(f"Calculated Distance between {point} and {centroid} : {distance} ")
+        return distance
 
     def _write_to_file(self, mapped_data, mapper_id):
         os.makedirs(f'Data/Mappers/M{mapper_id}', exist_ok=True)
-        for key, points in mapped_data.items():
-            with open(f'Data/Mappers/M{mapper_id}/mapper_{mapper_id}_output.txt', 'w') as f:
-                for point in points:
-                    f.write(' '.join(map(str, point)) + '\n')
+        with open(f'Data/Mappers/M{mapper_id}/mapper_{mapper_id}_output.txt', 'w') as f:
+            for key, point in mapped_data:
+                f.write(f"{key}\t{' '.join(map(str, point))}\n")
+        print(f"Wrote Mapped Data to File for Mapper {mapper_id} to mapper_{mapper_id}_output.txt ")
 
     def _partition_data(self, mapped_data):
-        partitions = {i: {} for i in range(self.num_reducers)}
-        for key, points in mapped_data.items():
+        partitions = {i: [] for i in range(self.num_reducers)}
+        for key, point in mapped_data:
             partition_id = key % self.num_reducers
-            partitions[partition_id][key] = points
+            partitions[partition_id].append((key, point))
+        print(f"Partitioned Data : {partitions} ")
         return partitions
-
+    
     def _write_partitions(self, partitions, mapper_id):
+        os.makedirs(f'Data/Mappers/M{mapper_id}', exist_ok=True)
         for partition_id, partition in partitions.items():
-            with open(f'Data/Mappers/M{mapper_id}/partition_{partition_id}.txt', 'w') as f:
-                for key, points in partition.items():
-                    for point in points:
-                        f.write(' '.join(map(str, point)) + '\n')
+            partition_file_path = f'Data/Mappers/M{mapper_id}/partition_{partition_id}.txt'
+            with open(partition_file_path, 'w') as f:
+                for key, point in partition:
+                    f.write(f"{key}\t{' '.join(map(str, point))}\n")
+            print(f"Wrote Partition {partition_id} to File for Mapper {mapper_id} ")
 
 def serve_mapper(num_reducers, port):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))

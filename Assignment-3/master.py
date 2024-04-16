@@ -23,13 +23,15 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
     def initialize_centroids(self, num_centroids, data):
         centroids = random.sample(data, num_centroids)
         with open("Data/centroids.txt", "w") as file:
-            for centroid in centroids:
+            for i, centroid in enumerate (centroids):
                 file.write(f"{','.join(map(str, centroid))}\n")
+                print(f"Initialized Centroid {i} : {centroid}")
         return centroids
 
     def load_input_file(self, input_file):
         with open(input_file, "r") as file:
             data = [[float(num) for num in line.strip().split(",")] for line in file]
+            print(f"Data: {data}")
         return data
     
     def start_map_reduce(self):
@@ -55,12 +57,13 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             if mapper_id == self.num_mappers - 1:
                 end_index += remaining_data
 
+            print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
             process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(50051 + mapper_id)])
             self.mapper_processes.append(process)
 
             with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
                 stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                centroids = [kmeans_pb2.Point(id=i, coordinates=c) for i, c in enumerate(self.centroids)]
+                centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
                 try:
                     response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id = mapper_id, start_idx = start_index, end_idx = end_index, centroids = centroids))
                     if not response.success:
