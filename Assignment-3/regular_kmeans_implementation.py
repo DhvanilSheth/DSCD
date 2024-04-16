@@ -10,8 +10,8 @@ def perform_kmeans(data, num_centroids):
     return kmeans.cluster_centers_
 
 def main():
-    file_path = 'points.txt'  # replace with your file path
-    num_centroids = int(input("Enter the number of centroids: "))
+    file_path = 'points.txt'
+    num_centroids = 5
     data = load_data(file_path)
     centroids = perform_kmeans(data, num_centroids)
     print("Centroids: ", centroids)
