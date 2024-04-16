@@ -6,9 +6,10 @@ import os
 import sys
 
 class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
-    def __init__(self, num_reducers):
+    def __init__(self, num_reducers, input_file):
         self.centroids = []
         self.num_reducers = num_reducers
+        self.input_file = input_file
 
     def MapTask(self, request, context):
         mapper_id = request.mapper_id
@@ -38,7 +39,7 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
         return parsed_centroids
 
     def _read_data_points(self, start_idx, end_idx):
-        with open('Data/Input/points.txt', 'r') as f:
+        with open(self.input_file, 'r') as f:
             lines = f.readlines()[start_idx:end_idx]
         data_points = [list(map(float, line.strip().split(","))) for line in lines]
         return data_points
@@ -90,18 +91,19 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
                     f.write(f"{key}\t{' '.join(map(str, point))}\n")
             print(f"Wrote Partition {partition_id} to File for Mapper {mapper_id} ")
 
-def serve_mapper(num_reducers, port):
+def serve_mapper(num_reducers, port, input_file):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Mapper(num_reducers), server)
+    kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Mapper(num_reducers, input_file), server)
     server.add_insecure_port(f'localhost:{port}')
     server.start()
     server.wait_for_termination()
 
 if __name__ == '__main__':
-    if len(sys.argv) != 3:
-        print("Usage: mapper.py <num_reducers> <port>")
+    if len(sys.argv) != 4:
+        print("Usage: mapper.py <num_reducers> <port> <input_file>")
         sys.exit(1)
 
     num_reducers = int(sys.argv[1])
     port = int(sys.argv[2])
-    serve_mapper(num_reducers, port)
+    input_file = sys.argv[3]
+    serve_mapper(num_reducers, port, input_file)

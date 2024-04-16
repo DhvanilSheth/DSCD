@@ -22,7 +22,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.convergence = False
 
     def initialize_centroids(self, num_centroids, data):
-        random.seed(0)
+        # random.seed(0)
         centroids = random.sample(data, num_centroids)
         with open("Data/centroids.txt", "w") as file:
             for i, centroid in enumerate (centroids):
@@ -37,6 +37,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         return data
     
     def start_map_reduce(self):
+        self.visualize()
         for iteration in range(self.max_iterations):
             print(f"Starting iteration {iteration+1}")
 
@@ -54,6 +55,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             if self.convergence:
                 print(f"Converged after {iteration+1} iterations")
                 print(f"Final centroids: {self.centroids}")
+                self.visualize(centroids_flag=True)
                 break
 
     def start_mapping(self):
@@ -68,7 +70,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                 end_index += remaining_data
 
             print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
-            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(5051 + mapper_id)])
+            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(5051 + mapper_id), str(input_file)])
             self.mapper_processes.append(process)
 
             with grpc.insecure_channel(f'localhost:{5051+mapper_id}') as channel:
@@ -139,6 +141,17 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             process.wait()
         print("All processes terminated")
 
+    def visualize(self, centroids_flag = False):
+        import matplotlib.pyplot as plt
+        data = self.load_input_file(self.input_file)
+        data = list(map(list, zip(*data)))
+        plt.scatter(data[0], data[1], color='blue')
+        if centroids_flag:
+            centroids = self.centroids
+            centroids = list(map(list, zip(*centroids)))
+            plt.scatter(centroids[0], centroids[1], color='red')
+        plt.show()
+
 def serve(master, timeout=3600):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(master, server)
@@ -155,7 +168,7 @@ if __name__ == '__main__':
     num_reducers = int(sys.argv[2])
     num_centroids = int(sys.argv[3])
     max_iterations = int(sys.argv[4])
-    input_file = "Data/Input/points.txt"
+    input_file = "Data/Input/points2.txt"
 
     master = Master(num_mappers, num_reducers, num_centroids, max_iterations, input_file)
     master.start_map_reduce()
