@@ -47,67 +47,54 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             self.update_centroids()
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
-
+    
     def start_mapping(self):
         chunk_size = len(self.data) // self.num_mappers
         remaining_data = len(self.data) % self.num_mappers
 
         for mapper_id in range(self.num_mappers):
             start_index = mapper_id * chunk_size
-            end_index = start_index + chunk_size
-
-            if mapper_id == self.num_mappers - 1:
-                end_index += remaining_data
+            end_index = start_index + chunk_size + (remaining_data if mapper_id == self.num_mappers - 1 else 0)
 
             print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
-            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(50051 + mapper_id)])
+            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(80051 + mapper_id)])
             self.mapper_processes.append(process)
 
-            with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
-                try:
-                    response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id = mapper_id, start_idx = start_index, end_idx = end_index, centroids = centroids))
-                    if not response.success:
-                        print(f"Mapper {mapper_id} failed")
-                        self.retry_mapping(mapper_id, start_index, end_index, centroids)
-                except grpc.RpcError as e:
-                    print(f"Mapper {mapper_id} failed with error: {e}")
-                    self.retry_mapping(mapper_id, start_index, end_index, centroids)
-            
-    def retry_mapping(self, mapper_id, start_idx, end_idx, centroids):
-        with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
-            stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-            response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id = mapper_id, start_idx = start_idx, end_idx = end_idx, centroids = centroids))
-            print(f"Mapper {mapper_id} response: {response.success}")
-            
+            success = self.attempt_rpc(mapper_id, start_index, end_index, 'map')
+            if not success:
+                print(f"Failed to complete mapping task with Mapper {mapper_id} after several attempts.")
+
+    def attempt_rpc(self, service_id, start_idx, end_idx, task_type, attempts=3, delay=2):
+        for attempt in range(attempts):
+            try:
+                with grpc.insecure_channel(f'localhost:{80051+service_id}') as channel:
+                    stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
+                    centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
+                    if task_type == 'map':
+                        response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id=service_id, start_idx=start_idx, end_idx=end_idx, centroids=centroids))
+                    elif task_type == 'reduce':
+                        response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id=service_id, keys=start_idx))
+                    if response.success:
+                        return True
+            except grpc.RpcError as e:
+                print(f"Attempt {attempt+1} failed for {task_type} task with service ID {service_id}: {e}")
+            time.sleep(delay)
+        return False
+
     def start_reducing(self):
         for reducer_id in range(self.num_reducers):
-            keys = set()  
+            keys = set()
             for mapper_id in range(self.num_mappers):
                 with open(f"Data/Mappers/M{mapper_id}/partition_{reducer_id}.txt", "r") as file:
                     keys.update([int(line.strip().split("\t")[0]) for line in file])
-            print(f"Reducer {reducer_id} processing keys: {keys}")
 
+            print(f"Reducer {reducer_id} processing keys: {keys}")
             process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(60051 + reducer_id)])
             self.reducer_processes.append(process)
 
-            with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                try:
-                    response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id = reducer_id, keys = list(keys)))
-                    if not response.success:
-                        print(f"Reducer {reducer_id} failed")
-                        self.retry_reducing(reducer_id, keys)
-                except grpc.RpcError as e:
-                    print(f"Reducer {reducer_id} failed with error: {e}")
-                    self.retry_reducing(reducer_id, keys)
-
-    def retry_reducing(self, reducer_id, keys):
-        with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
-            stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-            response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id = reducer_id, keys = keys))
-            print(f"Reducer {reducer_id} response: {response.success}")
+            success = self.attempt_rpc(reducer_id, list(keys), None, 'reduce')
+            if not success:
+                print(f"Failed to complete reducing task with Reducer {reducer_id} after several attempts.")
 
     def update_centroids(self):
         centroids = []
