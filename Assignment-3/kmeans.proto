@@ -20,6 +20,8 @@ message MapperResponse {
 message ReducerRequest {
   int32 reducer_id = 1;
   repeated int32 keys = 2; // Contains the keys that this reducer is responsible for (i.e., the centroid IDs)
+  repeated Point centroids = 3;  // Centroids from the previous iteration
+  repeated Point data_points = 4;  // Data points assigned to this reducer
 }
 
 message ReducerResponse {

@@ -26,7 +26,7 @@ class Reducer(kmeans_pb2_grpc.KMeansServiceServicer):
         )
 
     def _parse_data_points(self, data_points):
-        return {point.id: [coordinate for coordinate in point.coordinates] for point in data_points}
+        return {point.id: [point.x_coordinate[0], point.y_coordinate[0]] for point in data_points}
 
     def _shuffle_and_sort(self, data_points):
         shuffled_data = defaultdict(list)
@@ -41,8 +41,8 @@ class Reducer(kmeans_pb2_grpc.KMeansServiceServicer):
         return reduced_data
 
     def _write_to_file(self, reduced_data):
-        os.makedirs(f'Data/Reducers/R{self.reducer_id}', exist_ok=True)
-        with open(f'Data/Reducers/R{self.reducer_id}/reducer_{self.reducer_id}_output.txt', 'w') as f:
+        os.makedirs(f'Data/Reducers/', exist_ok=True)
+        with open(f'Data/Reducers/R{self.reducer_id}.txt', 'w') as f:
             for key, centroid in reduced_data.items():
                 f.write(f'{key} {" ".join(map(str, centroid))}\n')
 
