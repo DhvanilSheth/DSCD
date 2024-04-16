@@ -19,9 +19,10 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.centroids = self.initialize_centroids(centroids, self.data)
         self.mapper_processes = []
         self.reducer_processes = []
-        self.converged = False
+        self.convergence = False
 
     def initialize_centroids(self, num_centroids, data):
+        random.seed(0)
         centroids = random.sample(data, num_centroids)
         with open("Data/centroids.txt", "w") as file:
             for i, centroid in enumerate (centroids):
@@ -48,12 +49,12 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             self.update_centroids()
             print(f"Centroids updated")
 
-            if self.converged:
-                print("Convergence achieved, stopping iterations.")
+            print(f"Centroids after iteration {iteration+1}: {self.centroids}")
+
+            if self.convergence:
+                print(f"Converged after {iteration+1} iterations")
                 print(f"Final centroids: {self.centroids}")
                 break
-
-            print(f"Centroids after iteration {iteration+1}: {self.centroids}")
 
     def start_mapping(self):
         chunk_size = len(self.data) // self.num_mappers
@@ -116,20 +117,20 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                         time.sleep(2)
 
     def update_centroids(self):
-        new_centroids = []
+        previous_centroids = self.centroids.copy()
+        centroids = []
         for reducer_id in range(self.num_reducers):
             with open(f"Data/Reducers/R{reducer_id}.txt", "r") as file:
                 for line in file:
                     centroid = list(map(float, line.split()[1:]))
-                    new_centroids.append(centroid)
-
-        if new_centroids == self.centroids:
-            self.converged = True
-
-        self.centroids = new_centroids
+                    centroids.append(centroid)
+        self.centroids = centroids
         with open("Data/centroids.txt", "w") as file:
-            for centroid in new_centroids:
+            for centroid in centroids:
                 file.write(f"{','.join(map(str, centroid))}\n")
+
+        if previous_centroids == centroids:
+            self.convergence = True
 
     def terminate_processes(self):
         print("Terminating processes")
