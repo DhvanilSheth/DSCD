@@ -50,6 +50,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
 
             if self.converged:
                 print("Convergence achieved, stopping iterations.")
+                print(f"Final centroids: {self.centroids}")
                 break
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
