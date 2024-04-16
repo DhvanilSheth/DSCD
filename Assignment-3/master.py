@@ -48,17 +48,20 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             print(f"Centroids updated")
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
-    
+
     def start_mapping(self):
         chunk_size = len(self.data) // self.num_mappers
         remaining_data = len(self.data) % self.num_mappers
 
         for mapper_id in range(self.num_mappers):
             start_index = mapper_id * chunk_size
-            end_index = start_index + chunk_size + (remaining_data if mapper_id == self.num_mappers - 1 else 0)
+            end_index = start_index + chunk_size
+
+            if mapper_id == self.num_mappers - 1:
+                end_index += remaining_data
 
             print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
-            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(80051 + mapper_id)])
+            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(50051 + mapper_id)])
             self.mapper_processes.append(process)
 
             with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
@@ -91,7 +94,6 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
             print(f"Reducer {reducer_id} processing data: {data_points}")
 
-            print(f"Reducer {reducer_id} processing keys: {keys}")
             process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(60051 + reducer_id)])
             self.reducer_processes.append(process)
 
