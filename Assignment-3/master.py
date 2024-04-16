@@ -19,6 +19,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.centroids = self.initialize_centroids(centroids, self.data)
         self.mapper_processes = []
         self.reducer_processes = []
+        self.converged = False
 
     def initialize_centroids(self, num_centroids, data):
         centroids = random.sample(data, num_centroids)
@@ -46,6 +47,10 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
 
             self.update_centroids()
             print(f"Centroids updated")
+
+            if self.converged:
+                print("Convergence achieved, stopping iterations.")
+                break
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
 
@@ -110,15 +115,19 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                         time.sleep(2)
 
     def update_centroids(self):
-        centroids = []
+        new_centroids = []
         for reducer_id in range(self.num_reducers):
             with open(f"Data/Reducers/R{reducer_id}.txt", "r") as file:
                 for line in file:
                     centroid = list(map(float, line.split()[1:]))
-                    centroids.append(centroid)
-        self.centroids = centroids
+                    new_centroids.append(centroid)
+
+        if new_centroids == self.centroids:
+            self.converged = True
+
+        self.centroids = new_centroids
         with open("Data/centroids.txt", "w") as file:
-            for centroid in centroids:
+            for centroid in new_centroids:
                 file.write(f"{','.join(map(str, centroid))}\n")
 
     def terminate_processes(self):
