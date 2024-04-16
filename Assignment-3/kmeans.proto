@@ -19,7 +19,7 @@ message MapperResponse {
 // Request and Response for Reducer
 message ReducerRequest {
   int32 reducer_id = 1;
-  repeated int32 keys = 2; // Contains the keys that this reducer is responsible for
+  repeated int32 keys = 2; // Contains the keys that this reducer is responsible for (i.e., the centroid IDs)
 }
 
 message ReducerResponse {

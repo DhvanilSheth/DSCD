@@ -39,8 +39,10 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             print(f"Starting iteration {iteration+1}")
 
             self.start_mapping()
+            print("Mapping completed")
 
             self.start_reducing()
+            print("Reducing completed")
 
             self.update_centroids()
 
@@ -81,26 +83,26 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             
     def start_reducing(self):
         for reducer_id in range(self.num_reducers):
-            keys = []  
+            keys = set()  
             for mapper_id in range(self.num_mappers):
                 with open(f"Data/Mappers/M{mapper_id}/partition_{reducer_id}.txt", "r") as file:
-                    keys.extend([int(float(num)) for line in file for num in line.split()])
-                    print(f"Reducer {reducer_id} received keys from Mapper {mapper_id}: {keys}")
+                    keys.update([int(line.strip().split("\t")[0]) for line in file])
+            print(f"Reducer {reducer_id} processing keys: {keys}")
 
-            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(self.num_centroids)])
+            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(60051 + reducer_id)])
             self.reducer_processes.append(process)
 
             with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
                 stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
                 try:
-                    response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id = reducer_id, keys = keys))
+                    response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id = reducer_id, keys = list(keys)))
                     if not response.success:
                         print(f"Reducer {reducer_id} failed")
                         self.retry_reducing(reducer_id, keys)
                 except grpc.RpcError as e:
                     print(f"Reducer {reducer_id} failed with error: {e}")
                     self.retry_reducing(reducer_id, keys)
-    
+
     def retry_reducing(self, reducer_id, keys):
         with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
             stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
