@@ -61,10 +61,10 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                 end_index += remaining_data
 
             print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
-            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(50051 + mapper_id)])
+            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(5051 + mapper_id)])
             self.mapper_processes.append(process)
 
-            with grpc.insecure_channel(f'localhost:{50051+mapper_id}') as channel:
+            with grpc.insecure_channel(f'localhost:{5051+mapper_id}') as channel:
                 stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
                 centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
                 for attempt in range(4):
@@ -94,10 +94,10 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
             print(f"Reducer {reducer_id} processing data: {data_points}")
 
-            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(60051 + reducer_id)])
+            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(6051 + reducer_id)])
             self.reducer_processes.append(process)
 
-            with grpc.insecure_channel(f'localhost:{60051+reducer_id}') as channel:
+            with grpc.insecure_channel(f'localhost:{6051+reducer_id}') as channel:
                 stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
                 for attempt in range(4):
                     try:
@@ -121,31 +121,19 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             for centroid in centroids:
                 file.write(f"{','.join(map(str, centroid))}\n")
 
-    def MapperResponse(self, request, context):
-        print(f"Received response from Mapper {request.mapper_id}: {request.success}")
-        return kmeans_pb2.Empty()
-
-    def ReducerResponse(self, request, context):
-        print(f"Received response from Reducer {request.reducer_id}: {request.success}")
-        return kmeans_pb2.Empty()
-
     def terminate_processes(self):
         print("Terminating processes")
-        for process in self.mapper_processes:
+        for process in self.mapper_processes + self.reducer_processes:
             process.terminate()
-        for process in self.reducer_processes:
-            process.terminate()
+            process.wait()
+        print("All processes terminated")
 
-def serve(master):
+def serve(master, timeout=3600):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(master, server)
-    server.add_insecure_port('localhost:40051')
+    server.add_insecure_port('localhost:4051')
     server.start()
-    try:
-        while True:
-            time.sleep(86400)
-    except KeyboardInterrupt:
-        server.stop(0)
+    server.wait_for_termination(timeout=timeout)
 
 if __name__ == '__main__':
     if len(sys.argv) != 5:
@@ -160,5 +148,5 @@ if __name__ == '__main__':
 
     master = Master(num_mappers, num_reducers, num_centroids, max_iterations, input_file)
     master.start_map_reduce()
-    serve(master)
+    serve(master, timeout=5)
     master.terminate_processes()
