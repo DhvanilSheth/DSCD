@@ -47,11 +47,14 @@ class Reducer(kmeans_pb2_grpc.KMeansServiceServicer):
                 f.write(f'{key} {" ".join(map(str, centroid))}\n')
 
 def serve_reducer(reducer_id, port):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Reducer(reducer_id), server)
-    server.add_insecure_port(f'localhost:{port}')
-    server.start()
-    server.wait_for_termination()
+    try:
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Reducer(reducer_id), server)
+        server.add_insecure_port(f'localhost:{port}')
+        server.start()
+        server.wait_for_termination()
+    except RuntimeError:
+        pass
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:

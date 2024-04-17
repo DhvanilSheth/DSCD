@@ -7,6 +7,8 @@ import subprocess
 import os
 import sys
 from concurrent import futures
+import socket
+import shutil
 
 class Master(kmeans_pb2_grpc.KMeansServiceServicer):
     def __init__(self, mappers, reducers, centroids, iterations, input_file):
@@ -43,7 +45,9 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.visualize()
         for iteration in range(self.max_iterations):
             print(f"Starting iteration {iteration+1}")
-
+            if iteration > 0:
+                self.clear_files()
+                
             self.start_mapping()
             print(f"Mapping completed")
 
@@ -55,7 +59,6 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
             self.visualize(centroids_flag=True, iteration=iteration+1)
-            self.clear_files()
 
             if self.convergence:
                 print(f"Converged after {iteration+1} iterations")
@@ -88,7 +91,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                             print(f"Mapper {mapper_id} response: {response.success}")
                             break
                 except grpc.RpcError as e:
-                    port += 50
+                    port = get_free_port()
                     print(f"Mapper {mapper_id} failed with error: {e} , retrying on new port {port}")
                     process.terminate()
                     process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(port), str(input_file)])
@@ -124,7 +127,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                             print(f"Reducer {reducer_id} response: {response.success}")
                             break
                 except grpc.RpcError as e:
-                    port += 50
+                    port = get_free_port()
                     print(f"Reducer {reducer_id} failed with error: {e} , retrying on new port {port}")
                     process.terminate()
                     process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(port)])
@@ -169,12 +172,20 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
 
     def clear_files(self):
         for mapper_id in range(self.num_mappers):
+            os.remove(f"Data/Mappers/M{mapper_id}/mapper_{mapper_id}_output.txt")
             for reducer_id in range(self.num_reducers):
                 os.remove(f"Data/Mappers/M{mapper_id}/partition_{reducer_id}.txt")
         for reducer_id in range(self.num_reducers):
             os.remove(f"Data/Reducers/R{reducer_id}.txt")
 
-def serve(master, timeout=3600):
+def get_free_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(('localhost', 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
+
+def serve(master, timeout=3600):  
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(master, server)
     server.add_insecure_port('localhost:4051')
@@ -192,6 +203,8 @@ if __name__ == '__main__':
     max_iterations = int(sys.argv[4])
     input_file = sys.argv[5] #EG : Data/Input/points2.txt
 
+    shutil.rmtree("Data/Mappers", ignore_errors=True)
+    shutil.rmtree("Data/Reducers", ignore_errors=True)
     master = Master(num_mappers, num_reducers, num_centroids, max_iterations, input_file)
     master.start_map_reduce()
     serve(master, timeout=5)

@@ -92,11 +92,14 @@ class Mapper(kmeans_pb2_grpc.KMeansServiceServicer):
             print(f"Wrote Partition {partition_id} to File for Mapper {mapper_id} ")
 
 def serve_mapper(num_reducers, port, input_file):
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
-    kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Mapper(num_reducers, input_file), server)
-    server.add_insecure_port(f'localhost:{port}')
-    server.start()
-    server.wait_for_termination()
+    try:
+        server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        kmeans_pb2_grpc.add_KMeansServiceServicer_to_server(Mapper(num_reducers, input_file), server)
+        server.add_insecure_port(f'localhost:{port}')
+        server.start()
+        server.wait_for_termination()
+    except RuntimeError:
+        pass
 
 if __name__ == '__main__':
     if len(sys.argv) != 4:
