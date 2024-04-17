@@ -21,7 +21,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
         self.reducer_processes = []
         self.convergence = False
 
-        self.log_file = open('Data/dump.txt', 'a')
+        self.log_file = open('Data/dump.txt', 'w')
         sys.stdout = self.log_file
 
     def initialize_centroids(self, num_centroids, data):
@@ -55,6 +55,7 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
 
             print(f"Centroids after iteration {iteration+1}: {self.centroids}")
             self.visualize(centroids_flag=True, iteration=iteration+1)
+            self.clear_files()
 
             if self.convergence:
                 print(f"Converged after {iteration+1} iterations")
@@ -64,31 +65,35 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
     def start_mapping(self):
         chunk_size = len(self.data) // self.num_mappers
         remaining_data = len(self.data) % self.num_mappers
-
+    
         for mapper_id in range(self.num_mappers):
             start_index = mapper_id * chunk_size
             end_index = start_index + chunk_size
-
+    
             if mapper_id == self.num_mappers - 1:
                 end_index += remaining_data
-
+    
             print(f"Mapper {mapper_id} processing data from index {start_index} to {end_index}")
-            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(5051 + mapper_id), str(input_file)])
+            port = 5051 + mapper_id
+            process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(port), str(input_file)])
             self.mapper_processes.append(process)
-
-            with grpc.insecure_channel(f'localhost:{5051+mapper_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
-                for attempt in range(4):
-                    try:
+    
+            while True:
+                try:
+                    with grpc.insecure_channel(f'localhost:{port}') as channel:
+                        stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
+                        centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
                         response = stub.MapTask(kmeans_pb2.MapperRequest(mapper_id = mapper_id, start_idx = start_index, end_idx = end_index, centroids = centroids))
                         if response.success:
                             print(f"Mapper {mapper_id} response: {response.success}")
                             break
-                    except grpc.RpcError as e:
-                        print(f"Mapper {mapper_id} failed with error: {e} , retring attempt {attempt}")
-                        time.sleep(2)
-
+                except grpc.RpcError as e:
+                    port += 50
+                    print(f"Mapper {mapper_id} failed with error: {e} , retrying on new port {port}")
+                    process.terminate()
+                    process = subprocess.Popen(['python', 'mapper.py', str(self.num_reducers), str(port), str(input_file)])
+                time.sleep(1)
+    
     def start_reducing(self):
         for reducer_id in range(self.num_reducers):
             keys = []
@@ -101,25 +106,29 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
                         keys.append(int(key))
                         x_coordinates.append(x)
                         y_coordinates.append(y)
-
+    
             data_points = [kmeans_pb2.Point(id=int(key), x_coordinate=[x], y_coordinate=[y]) for key, x, y in zip(keys, x_coordinates, y_coordinates)]
             centroids = [kmeans_pb2.Point(id=i, x_coordinate=[c[0]], y_coordinate=[c[1]]) for i, c in enumerate(self.centroids)]
             print(f"Reducer {reducer_id} processing data: {data_points}")
-
-            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(6051 + reducer_id)])
+    
+            port = 6051 + reducer_id
+            process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(port)])
             self.reducer_processes.append(process)
-
-            with grpc.insecure_channel(f'localhost:{6051+reducer_id}') as channel:
-                stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
-                for attempt in range(4):
-                    try:
+    
+            while True:
+                try:
+                    with grpc.insecure_channel(f'localhost:{port}') as channel:
+                        stub = kmeans_pb2_grpc.KMeansServiceStub(channel)
                         response = stub.ReduceTask(kmeans_pb2.ReducerRequest(reducer_id=reducer_id, keys=list(map(int, keys)), centroids=centroids, data_points=data_points))
                         if response.success:
                             print(f"Reducer {reducer_id} response: {response.success}")
                             break
-                    except grpc.RpcError as e:
-                        print(f"Reducer {reducer_id} failed with error: {e} , retring attempt {attempt}")
-                        time.sleep(2)
+                except grpc.RpcError as e:
+                    port += 50
+                    print(f"Reducer {reducer_id} failed with error: {e} , retrying on new port {port}")
+                    process.terminate()
+                    process = subprocess.Popen(['python', 'reducer.py', str(reducer_id), str(port)])
+                time.sleep(1)
 
     def update_centroids(self):
         previous_centroids = self.centroids.copy()
@@ -157,6 +166,13 @@ class Master(kmeans_pb2_grpc.KMeansServiceServicer):
             plt.scatter(centroids[0], centroids[1], color='red')
         plt.title(f'KMeans Clustering - Iteration {iteration}')
         plt.show()
+
+    def clear_files(self):
+        for mapper_id in range(self.num_mappers):
+            for reducer_id in range(self.num_reducers):
+                os.remove(f"Data/Mappers/M{mapper_id}/partition_{reducer_id}.txt")
+        for reducer_id in range(self.num_reducers):
+            os.remove(f"Data/Reducers/R{reducer_id}.txt")
 
 def serve(master, timeout=3600):
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
