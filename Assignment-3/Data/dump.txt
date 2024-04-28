@@ -1,0 +1,606 @@
+Data: [[3.17927, -15.3348], [2014.25, 2008.99], [-1990.2, 2026.14], [1993.71, -1992.05], [0.676748, -9.80026], [-20.4299, -6.7774], [-2026.71, -1985.57], [1990.95, -2034.77], [-2016.11, -2008.42], [5.0882, 5.35829], [-2001.85, -2012.46], [-2032.15, 2015.38], [-1994.87, -2009.01], [2028.8, -1998.67], [-1988.71, -2008.03], [2008.1, -2023.23], [-2024.52, 2023.98], [2034.84, -1985.02], [-2015.38, -2021.69], [17.0072, -23.8128], [-20.3688, 8.86029], [-2034.56, -1989.06], [1998.64, 2014.4], [-1993.12, 2021.32], [1995.27, 2022.19], [2007.9, 2032.46], [-2029.59, 2014.95], [-1998.25, 2015.45], [-6.93304, -17.4223], [-3.74233, 15.144], [2034.5, -1997.42], [-2026.55, 2017.87], [-2031.82, 2019.99], [-17.6252, 22.4792], [2030.26, -2000.36], [2006.33, 1988.52], [-2000.84, 1992.66], [2026.08, 2014.1], [1993.89, 2025.86], [-2027.22, 2010.2], [-4.72045, -11.021], [9.11206, 12.7926], [2008.76, 1991.15], [-1993.27, -2033.25], [8.1492, -3.68892], [2032.47, 2031.07], [-2017.7, -2011.41], [-1992.65, -2019.16], [1998.59, 2034.15], [-1998.04, 2013.36], [-1996.93, -1993.03], [2010.05, 2029.51], [2034.73, 2013.63], [2011.57, 1994.7], [2016.34, -2002.12], [-1992.89, 1991.17], [-1997.84, -2019.3], [-10.696, -8.1843], [11.6543, 16.731], [2015.01, -1997.64], [-17.7763, -24.9191], [2025.31, -1992.37], [1990.78, 2012.66], [-2029.31, -2012.27], [-2000.69, 2012.17], [-3.16401, -14.903], [-2020.48, 2006.83], [3.8934, 1.62893], [1993.01, 2010.21], [9.78805, 21.2401], [2001.8, -2026.08], [2007.87, -1985.1], [2016.26, 1989.72], [-1988.42, 1987.42], [1999.5, -2023.63], [2005.54, 1995.1], [2015.21, 2007.58], [4.89135, 6.7362], [2026.44, -2003.76], [-2006.71, -2016.24], [-1998.1, 2012.76], [-2022.86, -2025.55], [2019.93, 2014.23], [-0.276955, -20.9807], [-2004.4, -2003.98], [15.2264, -17.5443], [2028.39, 2030.58], [-1998.62, -2032.84], [23.8266, -9.2494], [-9.7087, -16.3038], [-1991.55, -1992.44], [1992.74, -2018.65], [1988.83, 2017.05], [2012.25, -2012.59], [-10.0627, -1.72201], [-2027.37, 2001.15], [-2019.31, -1993.67], [18.6674, 11.2514], [-1987.8, -2028.64], [2024.25, -2008.77]]
+Starting iteration 1
+Mapper 0 processing data from index 0 to 50
+Mapper 0 response: True
+Mapper 1 processing data from index 50 to 100
+Mapper 1 response: True
+Mapping completed
+Reducer 0 processing data: [id: 4
+x_coordinate: 3.17927
+y_coordinate: -15.3348
+, id: 4
+x_coordinate: 2014.25
+y_coordinate: 2008.99
+, id: 4
+x_coordinate: -1990.2
+y_coordinate: 2026.14
+, x_coordinate: 1993.71
+y_coordinate: -1992.05
+, id: 4
+x_coordinate: 0.676748
+y_coordinate: -9.80026
+, id: 4
+x_coordinate: -20.4299
+y_coordinate: -6.7774
+, id: 3
+x_coordinate: -2026.71
+y_coordinate: -1985.57
+, id: 2
+x_coordinate: 1990.95
+y_coordinate: -2034.77
+, id: 3
+x_coordinate: -2016.11
+y_coordinate: -2008.42
+, id: 4
+x_coordinate: 5.0882
+y_coordinate: 5.35829
+, id: 3
+x_coordinate: -2001.85
+y_coordinate: -2012.46
+, id: 4
+x_coordinate: -2032.15
+y_coordinate: 2015.38
+, id: 3
+x_coordinate: -1994.87
+y_coordinate: -2009.01
+, x_coordinate: 2028.8
+y_coordinate: -1998.67
+, id: 3
+x_coordinate: -1988.71
+y_coordinate: -2008.03
+, id: 2
+x_coordinate: 2008.1
+y_coordinate: -2023.23
+, id: 4
+x_coordinate: -2024.52
+y_coordinate: 2023.98
+, x_coordinate: 2034.84
+y_coordinate: -1985.02
+, id: 1
+x_coordinate: -2015.38
+y_coordinate: -2021.69
+, id: 4
+x_coordinate: 17.0072
+y_coordinate: -23.8128
+, id: 4
+x_coordinate: -20.3688
+y_coordinate: 8.86029
+, id: 3
+x_coordinate: -2034.56
+y_coordinate: -1989.06
+, id: 4
+x_coordinate: 1998.64
+y_coordinate: 2014.4
+, id: 4
+x_coordinate: -1993.12
+y_coordinate: 2021.32
+, id: 4
+x_coordinate: 1995.27
+y_coordinate: 2022.19
+, id: 4
+x_coordinate: 2007.9
+y_coordinate: 2032.46
+, id: 4
+x_coordinate: -2029.59
+y_coordinate: 2014.95
+, id: 4
+x_coordinate: -1998.25
+y_coordinate: 2015.45
+, id: 4
+x_coordinate: -6.93304
+y_coordinate: -17.4223
+, id: 4
+x_coordinate: -3.74233
+y_coordinate: 15.144
+, x_coordinate: 2034.5
+y_coordinate: -1997.42
+, id: 4
+x_coordinate: -2026.55
+y_coordinate: 2017.87
+, id: 4
+x_coordinate: -2031.82
+y_coordinate: 2019.99
+, id: 4
+x_coordinate: -17.6252
+y_coordinate: 22.4792
+, x_coordinate: 2030.26
+y_coordinate: -2000.36
+, id: 4
+x_coordinate: 2006.33
+y_coordinate: 1988.52
+, id: 4
+x_coordinate: -2000.84
+y_coordinate: 1992.66
+, id: 4
+x_coordinate: 2026.08
+y_coordinate: 2014.1
+, id: 4
+x_coordinate: 1993.89
+y_coordinate: 2025.86
+, id: 4
+x_coordinate: -2027.22
+y_coordinate: 2010.2
+, id: 4
+x_coordinate: -4.72045
+y_coordinate: -11.021
+, id: 4
+x_coordinate: 9.11206
+y_coordinate: 12.7926
+, id: 4
+x_coordinate: 2008.76
+y_coordinate: 1991.15
+, id: 1
+x_coordinate: -1993.27
+y_coordinate: -2033.25
+, id: 4
+x_coordinate: 8.1492
+y_coordinate: -3.68892
+, id: 4
+x_coordinate: 2032.47
+y_coordinate: 2031.07
+, id: 3
+x_coordinate: -2017.7
+y_coordinate: -2011.41
+, id: 1
+x_coordinate: -1992.65
+y_coordinate: -2019.16
+, id: 4
+x_coordinate: 1998.59
+y_coordinate: 2034.15
+, id: 4
+x_coordinate: -1998.04
+y_coordinate: 2013.36
+, id: 3
+x_coordinate: -1996.93
+y_coordinate: -1993.03
+, id: 4
+x_coordinate: 2010.05
+y_coordinate: 2029.51
+, id: 4
+x_coordinate: 2034.73
+y_coordinate: 2013.63
+, id: 4
+x_coordinate: 2011.57
+y_coordinate: 1994.7
+, x_coordinate: 2016.34
+y_coordinate: -2002.12
+, id: 4
+x_coordinate: -1992.89
+y_coordinate: 1991.17
+, id: 1
+x_coordinate: -1997.84
+y_coordinate: -2019.3
+, id: 4
+x_coordinate: -10.696
+y_coordinate: -8.1843
+, id: 4
+x_coordinate: 11.6543
+y_coordinate: 16.731
+, x_coordinate: 2015.01
+y_coordinate: -1997.64
+, id: 4
+x_coordinate: -17.7763
+y_coordinate: -24.9191
+, x_coordinate: 2025.31
+y_coordinate: -1992.37
+, id: 4
+x_coordinate: 1990.78
+y_coordinate: 2012.66
+, id: 3
+x_coordinate: -2029.31
+y_coordinate: -2012.27
+, id: 4
+x_coordinate: -2000.69
+y_coordinate: 2012.17
+, id: 4
+x_coordinate: -3.16401
+y_coordinate: -14.903
+, id: 4
+x_coordinate: -2020.48
+y_coordinate: 2006.83
+, id: 4
+x_coordinate: 3.8934
+y_coordinate: 1.62893
+, id: 4
+x_coordinate: 1993.01
+y_coordinate: 2010.21
+, id: 4
+x_coordinate: 9.78805
+y_coordinate: 21.2401
+, id: 2
+x_coordinate: 2001.8
+y_coordinate: -2026.08
+, x_coordinate: 2007.87
+y_coordinate: -1985.1
+, id: 4
+x_coordinate: 2016.26
+y_coordinate: 1989.72
+, id: 4
+x_coordinate: -1988.42
+y_coordinate: 1987.42
+, id: 2
+x_coordinate: 1999.5
+y_coordinate: -2023.63
+, id: 4
+x_coordinate: 2005.54
+y_coordinate: 1995.1
+, id: 4
+x_coordinate: 2015.21
+y_coordinate: 2007.58
+, id: 4
+x_coordinate: 4.89135
+y_coordinate: 6.7362
+, x_coordinate: 2026.44
+y_coordinate: -2003.76
+, id: 1
+x_coordinate: -2006.71
+y_coordinate: -2016.24
+, id: 4
+x_coordinate: -1998.1
+y_coordinate: 2012.76
+, id: 1
+x_coordinate: -2022.86
+y_coordinate: -2025.55
+, id: 4
+x_coordinate: 2019.93
+y_coordinate: 2014.23
+, id: 4
+x_coordinate: -0.276955
+y_coordinate: -20.9807
+, id: 3
+x_coordinate: -2004.4
+y_coordinate: -2003.98
+, id: 4
+x_coordinate: 15.2264
+y_coordinate: -17.5443
+, id: 4
+x_coordinate: 2028.39
+y_coordinate: 2030.58
+, id: 1
+x_coordinate: -1998.62
+y_coordinate: -2032.84
+, id: 4
+x_coordinate: 23.8266
+y_coordinate: -9.2494
+, id: 4
+x_coordinate: -9.7087
+y_coordinate: -16.3038
+, id: 3
+x_coordinate: -1991.55
+y_coordinate: -1992.44
+, id: 2
+x_coordinate: 1992.74
+y_coordinate: -2018.65
+, id: 4
+x_coordinate: 1988.83
+y_coordinate: 2017.05
+, x_coordinate: 2012.25
+y_coordinate: -2012.59
+, id: 4
+x_coordinate: -10.0627
+y_coordinate: -1.72201
+, id: 4
+x_coordinate: -2027.37
+y_coordinate: 2001.15
+, id: 3
+x_coordinate: -2019.31
+y_coordinate: -1993.67
+, id: 4
+x_coordinate: 18.6674
+y_coordinate: 11.2514
+, id: 1
+x_coordinate: -1987.8
+y_coordinate: -2028.64
+, x_coordinate: 2024.25
+y_coordinate: -2008.77
+]
+Reducer 0 response: True
+Reducing completed
+Centroids updated
+Centroids after iteration 1: [[2024.25, -2008.77001953125], [-1987.800048828125, -2028.6400146484375], [1992.739990234375, -2018.6500244140625], [-2019.31005859375, -1993.6700439453125], [18.667400360107422, 11.251399993896484]]
+Data: [[3.17927, -15.3348], [2014.25, 2008.99], [-1990.2, 2026.14], [1993.71, -1992.05], [0.676748, -9.80026], [-20.4299, -6.7774], [-2026.71, -1985.57], [1990.95, -2034.77], [-2016.11, -2008.42], [5.0882, 5.35829], [-2001.85, -2012.46], [-2032.15, 2015.38], [-1994.87, -2009.01], [2028.8, -1998.67], [-1988.71, -2008.03], [2008.1, -2023.23], [-2024.52, 2023.98], [2034.84, -1985.02], [-2015.38, -2021.69], [17.0072, -23.8128], [-20.3688, 8.86029], [-2034.56, -1989.06], [1998.64, 2014.4], [-1993.12, 2021.32], [1995.27, 2022.19], [2007.9, 2032.46], [-2029.59, 2014.95], [-1998.25, 2015.45], [-6.93304, -17.4223], [-3.74233, 15.144], [2034.5, -1997.42], [-2026.55, 2017.87], [-2031.82, 2019.99], [-17.6252, 22.4792], [2030.26, -2000.36], [2006.33, 1988.52], [-2000.84, 1992.66], [2026.08, 2014.1], [1993.89, 2025.86], [-2027.22, 2010.2], [-4.72045, -11.021], [9.11206, 12.7926], [2008.76, 1991.15], [-1993.27, -2033.25], [8.1492, -3.68892], [2032.47, 2031.07], [-2017.7, -2011.41], [-1992.65, -2019.16], [1998.59, 2034.15], [-1998.04, 2013.36], [-1996.93, -1993.03], [2010.05, 2029.51], [2034.73, 2013.63], [2011.57, 1994.7], [2016.34, -2002.12], [-1992.89, 1991.17], [-1997.84, -2019.3], [-10.696, -8.1843], [11.6543, 16.731], [2015.01, -1997.64], [-17.7763, -24.9191], [2025.31, -1992.37], [1990.78, 2012.66], [-2029.31, -2012.27], [-2000.69, 2012.17], [-3.16401, -14.903], [-2020.48, 2006.83], [3.8934, 1.62893], [1993.01, 2010.21], [9.78805, 21.2401], [2001.8, -2026.08], [2007.87, -1985.1], [2016.26, 1989.72], [-1988.42, 1987.42], [1999.5, -2023.63], [2005.54, 1995.1], [2015.21, 2007.58], [4.89135, 6.7362], [2026.44, -2003.76], [-2006.71, -2016.24], [-1998.1, 2012.76], [-2022.86, -2025.55], [2019.93, 2014.23], [-0.276955, -20.9807], [-2004.4, -2003.98], [15.2264, -17.5443], [2028.39, 2030.58], [-1998.62, -2032.84], [23.8266, -9.2494], [-9.7087, -16.3038], [-1991.55, -1992.44], [1992.74, -2018.65], [1988.83, 2017.05], [2012.25, -2012.59], [-10.0627, -1.72201], [-2027.37, 2001.15], [-2019.31, -1993.67], [18.6674, 11.2514], [-1987.8, -2028.64], [2024.25, -2008.77]]
+Starting iteration 2
+Mapper 0 processing data from index 0 to 50
+Mapper 0 response: True
+Mapper 1 processing data from index 50 to 100
+Mapper 1 response: True
+Mapping completed
+Reducer 0 processing data: [id: 4
+x_coordinate: 3.17927
+y_coordinate: -15.3348
+, id: 4
+x_coordinate: 2014.25
+y_coordinate: 2008.99
+, id: 4
+x_coordinate: -1990.2
+y_coordinate: 2026.14
+, id: 2
+x_coordinate: 1993.71
+y_coordinate: -1992.05
+, id: 4
+x_coordinate: 0.676748
+y_coordinate: -9.80026
+, id: 4
+x_coordinate: -20.4299
+y_coordinate: -6.7774
+, id: 3
+x_coordinate: -2026.71
+y_coordinate: -1985.57
+, id: 2
+x_coordinate: 1990.95
+y_coordinate: -2034.77
+, id: 3
+x_coordinate: -2016.11
+y_coordinate: -2008.42
+, id: 4
+x_coordinate: 5.0882
+y_coordinate: 5.35829
+, id: 1
+x_coordinate: -2001.85
+y_coordinate: -2012.46
+, id: 4
+x_coordinate: -2032.15
+y_coordinate: 2015.38
+, id: 1
+x_coordinate: -1994.87
+y_coordinate: -2009.01
+, x_coordinate: 2028.8
+y_coordinate: -1998.67
+, id: 1
+x_coordinate: -1988.71
+y_coordinate: -2008.03
+, id: 2
+x_coordinate: 2008.1
+y_coordinate: -2023.23
+, id: 4
+x_coordinate: -2024.52
+y_coordinate: 2023.98
+, x_coordinate: 2034.84
+y_coordinate: -1985.02
+, id: 3
+x_coordinate: -2015.38
+y_coordinate: -2021.69
+, id: 4
+x_coordinate: 17.0072
+y_coordinate: -23.8128
+, id: 4
+x_coordinate: -20.3688
+y_coordinate: 8.86029
+, id: 3
+x_coordinate: -2034.56
+y_coordinate: -1989.06
+, id: 4
+x_coordinate: 1998.64
+y_coordinate: 2014.4
+, id: 4
+x_coordinate: -1993.12
+y_coordinate: 2021.32
+, id: 4
+x_coordinate: 1995.27
+y_coordinate: 2022.19
+, id: 4
+x_coordinate: 2007.9
+y_coordinate: 2032.46
+, id: 4
+x_coordinate: -2029.59
+y_coordinate: 2014.95
+, id: 4
+x_coordinate: -1998.25
+y_coordinate: 2015.45
+, id: 4
+x_coordinate: -6.93304
+y_coordinate: -17.4223
+, id: 4
+x_coordinate: -3.74233
+y_coordinate: 15.144
+, x_coordinate: 2034.5
+y_coordinate: -1997.42
+, id: 4
+x_coordinate: -2026.55
+y_coordinate: 2017.87
+, id: 4
+x_coordinate: -2031.82
+y_coordinate: 2019.99
+, id: 4
+x_coordinate: -17.6252
+y_coordinate: 22.4792
+, x_coordinate: 2030.26
+y_coordinate: -2000.36
+, id: 4
+x_coordinate: 2006.33
+y_coordinate: 1988.52
+, id: 4
+x_coordinate: -2000.84
+y_coordinate: 1992.66
+, id: 4
+x_coordinate: 2026.08
+y_coordinate: 2014.1
+, id: 4
+x_coordinate: 1993.89
+y_coordinate: 2025.86
+, id: 4
+x_coordinate: -2027.22
+y_coordinate: 2010.2
+, id: 4
+x_coordinate: -4.72045
+y_coordinate: -11.021
+, id: 4
+x_coordinate: 9.11206
+y_coordinate: 12.7926
+, id: 4
+x_coordinate: 2008.76
+y_coordinate: 1991.15
+, id: 1
+x_coordinate: -1993.27
+y_coordinate: -2033.25
+, id: 4
+x_coordinate: 8.1492
+y_coordinate: -3.68892
+, id: 4
+x_coordinate: 2032.47
+y_coordinate: 2031.07
+, id: 3
+x_coordinate: -2017.7
+y_coordinate: -2011.41
+, id: 1
+x_coordinate: -1992.65
+y_coordinate: -2019.16
+, id: 4
+x_coordinate: 1998.59
+y_coordinate: 2034.15
+, id: 4
+x_coordinate: -1998.04
+y_coordinate: 2013.36
+, id: 3
+x_coordinate: -1996.93
+y_coordinate: -1993.03
+, id: 4
+x_coordinate: 2010.05
+y_coordinate: 2029.51
+, id: 4
+x_coordinate: 2034.73
+y_coordinate: 2013.63
+, id: 4
+x_coordinate: 2011.57
+y_coordinate: 1994.7
+, x_coordinate: 2016.34
+y_coordinate: -2002.12
+, id: 4
+x_coordinate: -1992.89
+y_coordinate: 1991.17
+, id: 1
+x_coordinate: -1997.84
+y_coordinate: -2019.3
+, id: 4
+x_coordinate: -10.696
+y_coordinate: -8.1843
+, id: 4
+x_coordinate: 11.6543
+y_coordinate: 16.731
+, x_coordinate: 2015.01
+y_coordinate: -1997.64
+, id: 4
+x_coordinate: -17.7763
+y_coordinate: -24.9191
+, x_coordinate: 2025.31
+y_coordinate: -1992.37
+, id: 4
+x_coordinate: 1990.78
+y_coordinate: 2012.66
+, id: 3
+x_coordinate: -2029.31
+y_coordinate: -2012.27
+, id: 4
+x_coordinate: -2000.69
+y_coordinate: 2012.17
+, id: 4
+x_coordinate: -3.16401
+y_coordinate: -14.903
+, id: 4
+x_coordinate: -2020.48
+y_coordinate: 2006.83
+, id: 4
+x_coordinate: 3.8934
+y_coordinate: 1.62893
+, id: 4
+x_coordinate: 1993.01
+y_coordinate: 2010.21
+, id: 4
+x_coordinate: 9.78805
+y_coordinate: 21.2401
+, id: 2
+x_coordinate: 2001.8
+y_coordinate: -2026.08
+, x_coordinate: 2007.87
+y_coordinate: -1985.1
+, id: 4
+x_coordinate: 2016.26
+y_coordinate: 1989.72
+, id: 4
+x_coordinate: -1988.42
+y_coordinate: 1987.42
+, id: 2
+x_coordinate: 1999.5
+y_coordinate: -2023.63
+, id: 4
+x_coordinate: 2005.54
+y_coordinate: 1995.1
+, id: 4
+x_coordinate: 2015.21
+y_coordinate: 2007.58
+, id: 4
+x_coordinate: 4.89135
+y_coordinate: 6.7362
+, x_coordinate: 2026.44
+y_coordinate: -2003.76
+, id: 1
+x_coordinate: -2006.71
+y_coordinate: -2016.24
+, id: 4
+x_coordinate: -1998.1
+y_coordinate: 2012.76
+, id: 3
+x_coordinate: -2022.86
+y_coordinate: -2025.55
+, id: 4
+x_coordinate: 2019.93
+y_coordinate: 2014.23
+, id: 4
+x_coordinate: -0.276955
+y_coordinate: -20.9807
+, id: 3
+x_coordinate: -2004.4
+y_coordinate: -2003.98
+, id: 4
+x_coordinate: 15.2264
+y_coordinate: -17.5443
+, id: 4
+x_coordinate: 2028.39
+y_coordinate: 2030.58
+, id: 1
+x_coordinate: -1998.62
+y_coordinate: -2032.84
+, id: 4
+x_coordinate: 23.8266
+y_coordinate: -9.2494
+, id: 4
+x_coordinate: -9.7087
+y_coordinate: -16.3038
+, id: 3
+x_coordinate: -1991.55
+y_coordinate: -1992.44
+, id: 2
+x_coordinate: 1992.74
+y_coordinate: -2018.65
+, id: 4
+x_coordinate: 1988.83
+y_coordinate: 2017.05
+, x_coordinate: 2012.25
+y_coordinate: -2012.59
+, id: 4
+x_coordinate: -10.0627
+y_coordinate: -1.72201
+, id: 4
+x_coordinate: -2027.37
+y_coordinate: 2001.15
+, id: 3
+x_coordinate: -2019.31
+y_coordinate: -1993.67
+, id: 4
+x_coordinate: 18.6674
+y_coordinate: 11.2514
+, id: 1
+x_coordinate: -1987.8
+y_coordinate: -2028.64
+, x_coordinate: 2024.25
+y_coordinate: -2008.77
+]
+Reducer 0 response: True
+Reducing completed
+Centroids updated
+Centroids after iteration 2: [[2024.25, -2008.77001953125], [-1987.800048828125, -2028.6400146484375], [1992.739990234375, -2018.6500244140625], [-2019.31005859375, -1993.6700439453125], [18.667400360107422, 11.251399993896484]]
+Data: [[3.17927, -15.3348], [2014.25, 2008.99], [-1990.2, 2026.14], [1993.71, -1992.05], [0.676748, -9.80026], [-20.4299, -6.7774], [-2026.71, -1985.57], [1990.95, -2034.77], [-2016.11, -2008.42], [5.0882, 5.35829], [-2001.85, -2012.46], [-2032.15, 2015.38], [-1994.87, -2009.01], [2028.8, -1998.67], [-1988.71, -2008.03], [2008.1, -2023.23], [-2024.52, 2023.98], [2034.84, -1985.02], [-2015.38, -2021.69], [17.0072, -23.8128], [-20.3688, 8.86029], [-2034.56, -1989.06], [1998.64, 2014.4], [-1993.12, 2021.32], [1995.27, 2022.19], [2007.9, 2032.46], [-2029.59, 2014.95], [-1998.25, 2015.45], [-6.93304, -17.4223], [-3.74233, 15.144], [2034.5, -1997.42], [-2026.55, 2017.87], [-2031.82, 2019.99], [-17.6252, 22.4792], [2030.26, -2000.36], [2006.33, 1988.52], [-2000.84, 1992.66], [2026.08, 2014.1], [1993.89, 2025.86], [-2027.22, 2010.2], [-4.72045, -11.021], [9.11206, 12.7926], [2008.76, 1991.15], [-1993.27, -2033.25], [8.1492, -3.68892], [2032.47, 2031.07], [-2017.7, -2011.41], [-1992.65, -2019.16], [1998.59, 2034.15], [-1998.04, 2013.36], [-1996.93, -1993.03], [2010.05, 2029.51], [2034.73, 2013.63], [2011.57, 1994.7], [2016.34, -2002.12], [-1992.89, 1991.17], [-1997.84, -2019.3], [-10.696, -8.1843], [11.6543, 16.731], [2015.01, -1997.64], [-17.7763, -24.9191], [2025.31, -1992.37], [1990.78, 2012.66], [-2029.31, -2012.27], [-2000.69, 2012.17], [-3.16401, -14.903], [-2020.48, 2006.83], [3.8934, 1.62893], [1993.01, 2010.21], [9.78805, 21.2401], [2001.8, -2026.08], [2007.87, -1985.1], [2016.26, 1989.72], [-1988.42, 1987.42], [1999.5, -2023.63], [2005.54, 1995.1], [2015.21, 2007.58], [4.89135, 6.7362], [2026.44, -2003.76], [-2006.71, -2016.24], [-1998.1, 2012.76], [-2022.86, -2025.55], [2019.93, 2014.23], [-0.276955, -20.9807], [-2004.4, -2003.98], [15.2264, -17.5443], [2028.39, 2030.58], [-1998.62, -2032.84], [23.8266, -9.2494], [-9.7087, -16.3038], [-1991.55, -1992.44], [1992.74, -2018.65], [1988.83, 2017.05], [2012.25, -2012.59], [-10.0627, -1.72201], [-2027.37, 2001.15], [-2019.31, -1993.67], [18.6674, 11.2514], [-1987.8, -2028.64], [2024.25, -2008.77]]
+Converged after 2 iterations
+Final centroids: [[2024.25, -2008.77001953125], [-1987.800048828125, -2028.6400146484375], [1992.739990234375, -2018.6500244140625], [-2019.31005859375, -1993.6700439453125], [18.667400360107422, 11.251399993896484]]
+Terminating processes
+All processes terminated
